@@ -1,0 +1,9 @@
+datasets/
+dataset/
+runs/
+weights/
+*.pt
+*.tar
+*.zip
+*.log
+
