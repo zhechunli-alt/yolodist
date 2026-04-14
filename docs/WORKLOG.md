@@ -1,0 +1,413 @@
+# 工作记录
+
+这份文档按“工程笔记”的方式记录项目推进过程。每一步都尽量说明三件事：
+
+1. 做了什么
+2. 为什么要这么做
+3. 你可以从这一步学到什么
+
+## 2026-03-11 第一步：重构项目目录
+
+### 做了什么
+
+- 按较标准的机器学习项目结构重组了仓库目录：
+  - `datasets/`
+  - `experiments/`
+  - `runs/`
+  - `weights/`
+  - `ultralytics-src/`
+- 把 MVTec 压缩包移动到了 `datasets/mvtec/`
+- 把 MVTec AD 数据集解压到了 `datasets/mvtec/`
+- 把原来根目录的测试脚本移动到了 [experiments/baseline/predict.py](/Users/lizhechun/Desktop/yolodist/experiments/baseline/predict.py)
+
+### 为什么要这么做
+
+- 论文项目和普通练习脚本不一样，数据、代码、权重、输出结果如果都混在根目录，后面会非常难维护。
+- `experiments/` 目录适合放实验入口脚本，因为它可以清楚表达“这个脚本属于哪个实验方向”。
+- `runs/` 单独拿出来非常重要，因为 Ultralytics 训练时会生成很多结果文件，不分离的话仓库会很快变乱。
+
+### 你可以学到什么
+
+- 项目结构不是表面工作，而是后续实验效率的一部分。
+- 当你准备做多组实验、保存多版结果时，一个清晰的目录结构会直接减少很多低级错误。
+
+## 2026-03-11 第二步：阅读选题并收缩为可落地目标
+
+### 做了什么
+
+- 阅读了导师给的选题文档。
+- 从完整选题中提炼出当前最适合先落地的“模型主线”。
+- 把第一阶段目标从“大而全”的方案收缩为一条更可执行的路径：
+  - MVTec 数据预处理
+  - baseline 检测模型
+  - student / modified model 实验
+  - 蒸馏实验
+
+### 为什么要这么做
+
+- 选题文档里的目标覆盖了数据增强、模型改进、蒸馏、部署、前后端系统，这个范围适合中长期规划，但不适合一上来同时实现。
+- 如果模型训练链路本身还不稳定，就去做部署系统，价值会很低，因为你只是把一个还没定型的模型“包装起来”。
+- 对毕业论文来说，最重要的第一步通常是先把训练、评估、对比这条实验链跑通。
+
+### 你可以学到什么
+
+- 做研究工程时，第一件事往往不是“加更多功能”，而是“缩小范围，先做出最有价值的闭环”。
+- 一个完整但跑不通的大系统，不如一个范围清楚、可以反复实验的小系统。
+
+## 2026-03-11 第三步：确定当前技术路线
+
+### 做了什么
+
+- 选择 MVTec AD 作为第一阶段的核心数据集。
+- 决定把 MVTec 从“异常分割任务”转换成“YOLO 检测任务”。
+- 默认选择 `binary` 检测方式，也就是只区分“缺陷 / 非缺陷”。
+- 蒸馏策略先选择“教师模型伪标签蒸馏”。
+- `modified_model` 目录先作为后续轻量化模型实验的入口预留出来。
+
+### 为什么要这么做
+
+- MVTec 原始标注是 mask，不是 YOLO 需要的边界框，所以必须先做数据转换。
+- `binary` 是当前最稳妥的起点，因为 MVTec 的缺陷类别本身比较复杂，而且不同类数据量不均衡。
+- 伪标签蒸馏是目前最现实的第一版蒸馏方法，因为它不要求你一开始就深入修改 Ultralytics 内部结构。
+- 如果一上来就做中间层特征蒸馏或深度结构改造，工程难度会明显上升，容易把项目卡住。
+
+### 你可以学到什么
+
+- “可行”并不等于“最先进”，而是指当前阶段最容易做出稳定实验结果的方法。
+- 在论文项目里，先做一个能跑通的蒸馏 baseline，通常比一开始追求复杂算法更合理。
+
+## 2026-03-11 第四步：搭建项目代码骨架
+
+### 做了什么
+
+- 新增了项目说明文件 [README.md](/Users/lizhechun/Desktop/yolodist/README.md)
+- 新增了依赖清单 [requirements.txt](/Users/lizhechun/Desktop/yolodist/requirements.txt)
+- 新增了配置文件：
+  - [configs/data/mvtec_detection.toml](/Users/lizhechun/Desktop/yolodist/configs/data/mvtec_detection.toml)
+  - [configs/train/baseline.toml](/Users/lizhechun/Desktop/yolodist/configs/train/baseline.toml)
+  - [configs/train/modified_model.toml](/Users/lizhechun/Desktop/yolodist/configs/train/modified_model.toml)
+  - [configs/train/distillation.toml](/Users/lizhechun/Desktop/yolodist/configs/train/distillation.toml)
+- 新增了共享代码包 `src/yolodist/`
+
+### 为什么要这么做
+
+- 实验参数如果直接写死在脚本里，后面调参数、换数据集、换模型都会很麻烦。
+- 把逻辑做成共享包后，baseline、modified model、distillation 三条线就能共用代码，避免复制粘贴。
+- 这种结构更适合以后迁移到服务器上跑实验。
+
+### 你可以学到什么
+
+- 配置文件的作用不仅是“看起来规范”，更重要的是把“实验设定”和“代码逻辑”分离开。
+- 多实验项目里，公共逻辑尽量放在 `src/` 里，入口脚本尽量保持轻薄。
+
+## 2026-03-11 第五步：实现 MVTec 到 YOLO 的数据转换
+
+### 做了什么
+
+- 新增数据准备脚本 [tools/prepare_mvtec_detection.py](/Users/lizhechun/Desktop/yolodist/tools/prepare_mvtec_detection.py)
+- 新增数据转换核心实现 [src/yolodist/data/mvtec_detection.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/data/mvtec_detection.py)
+- 实现了这些能力：
+  - 自动发现 MVTec 类别目录
+  - 自动寻找对应 mask
+  - 从 mask 中提取连通区域
+  - 把连通区域转换为 YOLO 格式边界框
+  - 生成 YOLO 标签文件
+  - 划分 train / val / test
+  - 生成 `data.yaml`
+  - 生成 `manifest.json`
+
+### 为什么要这么做
+
+- MVTec 原始数据不能直接拿给 YOLO 检测代码训练，必须经过一层“任务格式转换”。
+- `manifest.json` 很有用，因为它记录了每张图像最终被分到了哪个 split，后面出问题时容易排查。
+- 数据预处理是整个实验链最基础的一层，必须先做扎实。
+
+### 你可以学到什么
+
+- 真实研究项目里，数据适配往往比训练代码本身更关键。
+- 模型能不能跑通，很多时候不是由模型结构决定，而是由数据处理是否正确决定。
+
+## 2026-03-11 第六步：统一训练入口
+
+### 做了什么
+
+- 新增统一训练入口实现 [src/yolodist/train/ultralytics_runner.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/train/ultralytics_runner.py)
+- 更新了实验脚本：
+  - [experiments/baseline/train.py](/Users/lizhechun/Desktop/yolodist/experiments/baseline/train.py)
+  - [experiments/modified_model/train.py](/Users/lizhechun/Desktop/yolodist/experiments/modified_model/train.py)
+  - [experiments/baseline/predict.py](/Users/lizhechun/Desktop/yolodist/experiments/baseline/predict.py)
+
+### 为什么要这么做
+
+- 最开始的占位脚本只是打印提示信息，不能真正作为后续实验入口。
+- 统一训练入口后，不同实验只需要切换配置文件，不需要重复写训练逻辑。
+- 路径处理统一后，后面上服务器时更不容易因为相对路径出错。
+
+### 你可以学到什么
+
+- 入口脚本应该尽量简单，只负责“调起某个流程”。
+- 真实逻辑最好沉淀到共享模块里，这样后面扩展实验会更省力。
+
+## 2026-03-11 第七步：实现第一版蒸馏流程
+
+### 做了什么
+
+- 新增蒸馏实现 [src/yolodist/distill/pseudo_label.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/distill/pseudo_label.py)
+- 更新了 [experiments/distillation/train.py](/Users/lizhechun/Desktop/yolodist/experiments/distillation/train.py)
+- 当前蒸馏流程包括：
+  1. 复制或链接已准备好的检测数据集
+  2. 使用教师模型为缺少训练标签的样本生成伪标签
+  3. 基于生成后的数据训练学生模型
+
+### 为什么要这么做
+
+- 选题的核心之一是轻量化模型蒸馏，所以项目里必须有一条教师模型到学生模型的训练路径。
+- 当前先选伪标签蒸馏，是因为它容易落地，且不依赖修改 YOLO 内部训练器。
+- 这能先建立起“教师模型存在时，学生模型如何受益”的实验闭环。
+
+### 你可以学到什么
+
+- 蒸馏不一定一开始就要做最复杂的中间特征蒸馏。
+- 一个可以重复运行、可以做对比实验的简单蒸馏版本，通常更适合作为第一版。
+
+## 2026-03-11 第八步：增加训练前检查和仓库清理规则
+
+### 做了什么
+
+- 在以下文件中加入了路径存在性检查：
+  - [src/yolodist/train/ultralytics_runner.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/train/ultralytics_runner.py)
+  - [src/yolodist/distill/pseudo_label.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/distill/pseudo_label.py)
+- 更新了 [.gitignore](/Users/lizhechun/Desktop/yolodist/.gitignore)，忽略：
+  - `datasets/processed/`
+  - `__pycache__/`
+  - `*.pyc`
+
+### 为什么要这么做
+
+- 服务器训练很耗时间，如果因为路径没配对而在运行后才报错，会浪费很多时间。
+- 处理后的数据一般不适合直接提交进 Git。
+- Python 编译缓存文件也不应该污染工作区。
+
+### 你可以学到什么
+
+- “防御性编程”在研究工程里非常重要，尤其是训练任务一跑可能就是几个小时甚至几天。
+- 很多高质量项目并不是功能更多，而是能更早、更明确地暴露错误。
+
+## 2026-03-11 第九步：增加评估与实验结果汇总能力
+
+### 做了什么
+
+- 新增评估配置：
+  - [configs/eval/baseline.toml](/Users/lizhechun/Desktop/yolodist/configs/eval/baseline.toml)
+  - [configs/eval/modified_model.toml](/Users/lizhechun/Desktop/yolodist/configs/eval/modified_model.toml)
+  - [configs/eval/distillation.toml](/Users/lizhechun/Desktop/yolodist/configs/eval/distillation.toml)
+- 新增评估实现：
+  - [src/yolodist/eval/runner.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/eval/runner.py)
+  - [experiments/baseline/evaluate.py](/Users/lizhechun/Desktop/yolodist/experiments/baseline/evaluate.py)
+  - [experiments/modified_model/evaluate.py](/Users/lizhechun/Desktop/yolodist/experiments/modified_model/evaluate.py)
+  - [experiments/distillation/evaluate.py](/Users/lizhechun/Desktop/yolodist/experiments/distillation/evaluate.py)
+- 新增实验汇总工具：
+  - [src/yolodist/reporting/summary.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/reporting/summary.py)
+  - [tools/summarize_run.py](/Users/lizhechun/Desktop/yolodist/tools/summarize_run.py)
+
+### 为什么要这么做
+
+- 一个项目如果只有训练，没有标准化评估，就很难做实验对比。
+- 毕业论文需要可复现、可比较的结果，而不是只证明“代码能跑”。
+- 自动汇总工具能帮你把 Ultralytics 生成的大量原始结果，整理成后续写论文时更容易使用的形式。
+
+### 你可以学到什么
+
+- 在实验项目里，“能训练”只是第一步，“能评估、能对比、能复盘”才是完整链路。
+- 很多时候，一个小的结果汇总脚本，能在后期节省大量整理实验表格的时间。
+
+## 2026-03-11 第十步：补充实验流程文档
+
+### 做了什么
+
+- 新增 [docs/EXPERIMENT_FLOW.md](/Users/lizhechun/Desktop/yolodist/docs/EXPERIMENT_FLOW.md)
+- 在 [README.md](/Users/lizhechun/Desktop/yolodist/README.md) 中补充了评估和结果汇总的命令说明
+
+### 为什么要这么做
+
+- 项目不仅要“你现在能看懂”，还要保证你之后换到服务器环境时还能快速回忆整个使用流程。
+- 文档化实验顺序，可以减少后期“先跑哪个脚本、后跑哪个脚本”的混乱。
+
+### 你可以学到什么
+
+- 文档不是项目完成后的附属品，而是工程的一部分。
+- 写清流程，本质上是在降低未来自己的理解成本。
+
+## 当前已完成的验证
+
+- 新增 Python 脚本已通过语法检查
+- MVTec mask 到 YOLO box 的关键路径已做过冒烟验证
+- 本地没有安装训练依赖
+- 本地没有真正启动训练任务
+
+## 当前项目已经达到的状态
+
+现在这个仓库已经具备后续在服务器上进行以下工作的基础：
+
+1. 安装依赖
+2. 准备检测格式数据集
+3. 放置 teacher / student / baseline 权重
+4. 运行训练
+5. 运行评估
+6. 汇总实验结果
+
+## 建议的下一步
+
+1. 给 `modified_model` 接入真正的轻量化学生模型，而不是暂时复用同一套 YOLO11 权重入口
+2. 为每次训练和评估增加“配置快照”与“运行说明”保存能力
+3. 增加 NEU-DET 数据集支持，形成更完整的论文实验对比
+4. 在 baseline 稳定后，决定是否继续使用 `binary` 检测，还是切换到更细粒度的 `defect_type` 检测
+
+## 2026-04-12 第十一步：接入真实的轻量学生模型配置
+
+### 做了什么
+
+- 新增了轻量学生模型 YAML：
+  - [configs/models/yolo11_student.yaml](/Users/lizhechun/Desktop/yolodist/configs/models/yolo11_student.yaml)
+- 更新了 `modified_model` 训练配置：
+  - [configs/train/modified_model.toml](/Users/lizhechun/Desktop/yolodist/configs/train/modified_model.toml)
+  - `model` 改为学生模型 YAML
+  - 新增 `pretrained`，用于加载 `weights/yolo11n.pt` 作为初始化权重
+- 更新了蒸馏训练配置：
+  - [configs/train/distillation.toml](/Users/lizhechun/Desktop/yolodist/configs/train/distillation.toml)
+  - `student_model` 改为学生模型 YAML
+  - 新增 `student_pretrained`
+
+### 为什么要这么做
+
+- 之前的 `modified_model` 只是“实验入口”，并没有真正体现结构上的学生模型。
+- 论文如果要做“轻量化模型 + 蒸馏”对比，至少要有一个明确的学生模型定义文件。
+- 用 `yaml + pretrained` 的方式训练，既能控制结构，又能利用预训练权重提升稳定性。
+
+### 你可以学到什么
+
+- 轻量化实验要“可复现”，不能只说“我训练了一个学生模型”，而要给出可追溯的结构定义文件。
+- 配置化地绑定结构和权重，是后续消融实验（改结构不改训练策略、改训练策略不改结构）的基础。
+
+## 2026-04-12 第十二步：升级蒸馏策略与实验可复现记录
+
+### 做了什么
+
+- 升级蒸馏实现：
+  - [src/yolodist/distill/pseudo_label.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/distill/pseudo_label.py)
+- 新增两种伪标签策略：
+  - `fill_empty`：只给空标签样本补教师框
+  - `merge_teacher`：在 IoU 过滤后将教师框并入训练标签
+- 新增蒸馏相关超参配置：
+  - `teacher_iou_threshold`
+  - `teacher_max_det`
+  - `distill_temperature`
+  - `distill_alpha`
+- 新增运行清单记录工具：
+  - [src/yolodist/reporting/manifest.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/reporting/manifest.py)
+- 训练与评估流程接入清单记录：
+  - [src/yolodist/train/ultralytics_runner.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/train/ultralytics_runner.py)
+  - [src/yolodist/eval/runner.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/eval/runner.py)
+
+### 为什么要这么做
+
+- 伪标签蒸馏不是单一方法，至少要可切换策略，才能做对比实验并回答“蒸馏到底带来了什么收益”。
+- 论文实验最怕“过几周后不知道当时怎么跑出来的”，所以需要自动保存运行时配置和上下文。
+- 将蒸馏超参先进入配置，即使当前还没实现完整特征蒸馏损失，也能为下一步扩展保留统一入口。
+
+### 你可以学到什么
+
+- 做论文实验时，代码能跑只是底线，真正关键是“同样配置能不能再次跑出同类结果”。
+- 当你给自己留好策略开关和参数入口，后续做消融实验会快很多。
+
+## 2026-04-14 第十三步：提出并文档化 PPLA 创新模块方案
+
+### 做了什么
+
+- 新增模块设计文档：
+  - [PPLA模块设计.md](/Users/lizhechun/Desktop/yolodist/docs/PPLA模块设计.md)
+- 在文档中明确了：
+  - 可行性评估
+  - 模块结构定义
+  - YOLO 接入位置
+  - 与 baseline / modified / distill 的关系
+  - 分阶段落地步骤
+  - 消融实验设计
+  - 风险与兜底
+
+### 为什么要这么做
+
+- 你当前项目已经有训练和蒸馏骨架，下一步需要一个真正“可写进论文创新点”的模块方向。
+- 在动代码前先形成模块设计文档，可以避免后续反复返工。
+- 该方案与选题的工业背景一致：小目标、长尾、轻量部署。
+
+### 你可以学到什么
+
+- 好的创新点不是“复杂模块堆叠”，而是“问题驱动 + 可落地 + 可验证”的组合。
+- 先有可执行文档，再做代码接入，能显著提高研究工程效率。
+
+## 2026-04-14 第十四步：完成 PPLA 可运行代码接入与服务器首跑增强
+
+### 做了什么
+
+- 新增 PPLA 模块代码：
+  - [src/yolodist/models/ppla.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/models/ppla.py)
+- 新增 Ultralytics 运行时注册器：
+  - [src/yolodist/models/registry.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/models/registry.py)
+- 在训练、蒸馏、评估入口中接入注册逻辑：
+  - [src/yolodist/train/ultralytics_runner.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/train/ultralytics_runner.py)
+  - [src/yolodist/distill/pseudo_label.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/distill/pseudo_label.py)
+  - [src/yolodist/eval/runner.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/eval/runner.py)
+- 更新学生模型配置：
+  - [configs/models/yolo11_student.yaml](/Users/lizhechun/Desktop/yolodist/configs/models/yolo11_student.yaml)（加入 PPLA）
+  - [configs/models/yolo11_student_plain.yaml](/Users/lizhechun/Desktop/yolodist/configs/models/yolo11_student_plain.yaml)（plain 消融对照）
+- 增加 plain 对照的训练与评估配置：
+  - [configs/train/modified_model_plain.toml](/Users/lizhechun/Desktop/yolodist/configs/train/modified_model_plain.toml)
+  - [configs/train/distillation_plain.toml](/Users/lizhechun/Desktop/yolodist/configs/train/distillation_plain.toml)
+  - [configs/eval/modified_model_plain.toml](/Users/lizhechun/Desktop/yolodist/configs/eval/modified_model_plain.toml)
+  - [configs/eval/distillation_plain.toml](/Users/lizhechun/Desktop/yolodist/configs/eval/distillation_plain.toml)
+- 实验入口改为支持 `--config` 参数，便于服务器批量实验：
+  - `experiments/*/train.py`
+  - `experiments/*/evaluate.py`
+- 新增服务器预检查脚本：
+  - [tools/preflight_check.py](/Users/lizhechun/Desktop/yolodist/tools/preflight_check.py)
+- 同步更新文档：
+  - [README.md](/Users/lizhechun/Desktop/yolodist/README.md)
+  - [docs/EXPERIMENT_FLOW.md](/Users/lizhechun/Desktop/yolodist/docs/EXPERIMENT_FLOW.md)
+  - [docs/服务器首跑清单.md](/Users/lizhechun/Desktop/yolodist/docs/服务器首跑清单.md)
+
+### 为什么要这么做
+
+- 仅有“模块设计文档”还不够，必须进入可执行代码阶段，才能真正验证创新点。
+- 运行时注册方案可以在不重度改动第三方源码的前提下，把自定义模块接入 Ultralytics。
+- 同时保留 plain 与 PPLA 双分支，是论文消融实验的必要条件。
+- 预检查脚本能在训练前提前暴露依赖/路径问题，减少服务器时间浪费。
+
+### 你可以学到什么
+
+- 研究工程推进应遵循“设计 -> 实现 -> 对照实验”三步闭环，而不是只停留在思路层。
+- 消融实验要从配置层就开始设计，否则后面很难保证对比公平。
+- 面向服务器的可运行性，不只是代码能跑，还包括参数入口、预检查和流程文档的一致性。
+
+## 2026-04-14 第十五步：让 distill_temperature/distill_alpha 真实参与蒸馏损失
+
+### 做了什么
+
+- 在蒸馏训练中接入响应蒸馏损失（response KD）：
+  - [src/yolodist/distill/pseudo_label.py](/Users/lizhechun/Desktop/yolodist/src/yolodist/distill/pseudo_label.py)
+- 新增配置开关：
+  - `enable_kd_loss = true`（见 `configs/train/distillation*.toml`）
+- 将总损失改为：
+  - `L_total = (1 - alpha) * L_det + alpha * L_kd(T)`
+- `distill_temperature` 用于 KD 温度缩放，`distill_alpha` 用于检测损失与 KD 损失加权融合。
+
+### 为什么要这么做
+
+- 之前这两个参数只记录在配置中，并不会真实影响反向传播。
+- 论文里如果要讨论温度和蒸馏权重超参，必须保证参数真正进入损失函数。
+- 这一步把蒸馏从“伪标签增强训练”推进到了“伪标签 + 响应蒸馏”的组合范式。
+
+### 你可以学到什么
+
+- 研究代码中的“参数存在”不等于“参数生效”，要看它是否参与梯度计算。
+- 当你把超参显式接入损失函数后，消融实验才有统计意义和可解释性。

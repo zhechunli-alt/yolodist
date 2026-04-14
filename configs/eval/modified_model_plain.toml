@@ -1,0 +1,10 @@
+[eval]
+model = "runs/modified/yolo11_student_plain/weights/best.pt"
+data = "datasets/processed/mvtec_detection/data.yaml"
+split = "test"
+project = "runs/modified"
+name = "modified_plain_eval"
+imgsz = 640
+batch = 16
+device = "0"
+

@@ -1,0 +1,9 @@
+[eval]
+model = "runs/baseline/yolo11n_baseline/weights/best.pt"
+data = "datasets/processed/mvtec_detection/data.yaml"
+split = "test"
+project = "runs/baseline"
+name = "baseline_eval"
+imgsz = 640
+batch = 16
+device = "0"

@@ -1,0 +1,11 @@
+[dataset]
+source_dir = "datasets/mvtec"
+output_dir = "datasets/processed/mvtec_detection"
+class_mode = "binary"
+seed = 42
+copy_images = true
+
+[splits]
+train = 0.7
+val = 0.15
+test = 0.15

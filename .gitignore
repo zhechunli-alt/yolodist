@@ -2,8 +2,10 @@ datasets/
 dataset/
 runs/
 weights/
+datasets/processed/
+__pycache__/
+*.pyc
 *.pt
 *.tar
 *.zip
 *.log
-

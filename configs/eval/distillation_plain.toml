@@ -1,0 +1,10 @@
+[eval]
+model = "runs/distill/yolo11_student_plain_distill/weights/best.pt"
+data = "datasets/processed/mvtec_detection/data.yaml"
+split = "test"
+project = "runs/distill"
+name = "distill_plain_eval"
+imgsz = 640
+batch = 16
+device = "0"
+

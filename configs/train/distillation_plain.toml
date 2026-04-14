@@ -1,0 +1,22 @@
+[distill]
+teacher_weights = "weights/teacher.pt"
+student_model = "configs/models/yolo11_student_plain.yaml"
+student_pretrained = "weights/yolo11n.pt"
+prepared_data = "datasets/processed/mvtec_detection/data.yaml"
+pseudo_dataset_dir = "datasets/processed/mvtec_detection_distill_plain"
+teacher_conf = 0.25
+label_strategy = "merge_teacher"
+teacher_iou_threshold = 0.5
+teacher_max_det = 100
+distill_temperature = 4.0
+distill_alpha = 0.5
+enable_kd_loss = true
+project = "runs/distill"
+name = "yolo11_student_plain_distill"
+epochs = 80
+imgsz = 640
+batch = 16
+device = "0"
+workers = 4
+seed = 42
+exist_ok = true
