@@ -1,0 +1,9 @@
+[eval]
+model = "runs/pku_market_pcb_modified/student_plain/weights/best.pt"
+data = "datasets/processed/pku_market_pcb_detection/data.yaml"
+split = "test"
+project = "runs/pku_market_pcb_modified"
+name = "student_plain_eval"
+imgsz = 640
+batch = 16
+device = "0"

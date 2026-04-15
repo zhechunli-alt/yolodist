@@ -1,0 +1,9 @@
+[eval]
+model = "runs/deeppcb_epfa/student_epfa/weights/best.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+split = "test"
+project = "runs/deeppcb_epfa"
+name = "student_epfa_eval"
+imgsz = 640
+batch = 16
+device = "0"

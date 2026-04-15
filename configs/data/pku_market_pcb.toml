@@ -1,0 +1,10 @@
+[dataset]
+name = "pku_market_pcb"
+source_dir = "datasets/pku_market_pcb"
+output_dir = "datasets/processed/pku_market_pcb_detection"
+split_seed = 42
+val_ratio = 0.1
+test_ratio = 0.2
+copy_images = true
+classes = ["open", "short", "mousebite", "spur", "spurious_copper", "missing_hole"]
+

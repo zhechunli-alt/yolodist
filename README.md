@@ -51,10 +51,31 @@ yolodist/
 python3 tools/prepare_mvtec_detection.py --config configs/data/mvtec_detection.toml
 ```
 
+Optional NEU-DET path:
+
+```bash
+python3 tools/prepare_neudet_detection.py --config configs/data/neudet_detection.toml
+```
+
+PCB datasets:
+
+```bash
+python3 tools/download_deeppcb_from_github.py --out datasets/deeppcb/PCBData
+python3 tools/prepare_pcb_detection.py --dataset deeppcb --src datasets/deeppcb --out datasets/processed/deeppcb_detection
+python3 tools/prepare_pcb_detection.py --dataset pku_market_pcb --src datasets/pku_market_pcb --out datasets/processed/pku_market_pcb_detection
+python3 tools/prepare_pcb_detection.py --dataset dspcbsd_plus --src datasets/dspcbsd_plus --out datasets/processed/dspcbsd_plus_detection
+```
+
 2. Run preflight checks before training:
 
 ```bash
 python3 tools/preflight_check.py
+```
+
+PCB detailed checks:
+
+```bash
+python3 tools/preflight_check.py --train-config configs/train/baseline_deeppcb.toml --data-config datasets/processed/deeppcb_detection/data.yaml
 ```
 
 3. Put model weights in `weights/`:
@@ -68,10 +89,22 @@ python3 tools/preflight_check.py
 python3 experiments/baseline/train.py
 ```
 
+NEU-DET baseline:
+
+```bash
+python3 experiments/baseline/train.py --config configs/train/baseline_neudet.toml
+```
+
 5. Run modified-model training (PPLA student by default):
 
 ```bash
 python3 experiments/modified_model/train.py
+```
+
+NEU-DET modified-model:
+
+```bash
+python3 experiments/modified_model/train.py --config configs/train/modified_model_neudet.toml
 ```
 
 Optional plain student ablation:
@@ -84,6 +117,18 @@ python3 experiments/modified_model/train.py --config configs/train/modified_mode
 
 ```bash
 python3 experiments/distillation/train.py
+```
+
+NEU-DET distillation:
+
+```bash
+python3 experiments/distillation/train.py --config configs/train/distillation_neudet.toml
+```
+
+PCB quick pipeline:
+
+```bash
+bash tools/run_pcb_pipeline.sh --dataset deeppcb --mode all
 ```
 
 Optional plain student distillation ablation:
@@ -100,6 +145,14 @@ python3 experiments/modified_model/evaluate.py
 python3 experiments/distillation/evaluate.py
 ```
 
+NEU-DET evaluation:
+
+```bash
+python3 experiments/baseline/evaluate.py --config configs/eval/baseline_neudet.toml
+python3 experiments/modified_model/evaluate.py --config configs/eval/modified_model_neudet.toml
+python3 experiments/distillation/evaluate.py --config configs/eval/distillation_neudet.toml
+```
+
 Plain ablation evaluation:
 
 ```bash
@@ -111,6 +164,12 @@ python3 experiments/distillation/evaluate.py --config configs/eval/distillation_
 
 ```bash
 python3 tools/summarize_run.py runs/baseline/your_run_name
+```
+
+Generate PCB paper tables:
+
+```bash
+python3 tools/summarize_run.py --pcb-table-root runs --output-dir runs/paper_tables
 ```
 
 ## Dependencies
@@ -132,8 +191,11 @@ pip install -r requirements.txt
   - `L_total = (1 - alpha) * L_det + alpha * L_kd(T)`
   - current `L_kd` uses MSE on teacher/student multi-scale detection outputs with temperature scaling
 - The default modified model is a PPLA-enhanced student YAML (`configs/models/yolo11_student.yaml`) and a plain ablation YAML is also provided (`configs/models/yolo11_student_plain.yaml`).
+- PCB migration adds an EPFA-Lite student YAML (`configs/models/yolo11_student_epfa.yaml`) intended for P3/P4/P5 edge-aware ablation.
 
 ## Project records
 
 - `docs/WORKLOG.md`: engineering changes and decisions already made
 - `docs/NEXT_STEPS.md`: recommended implementation order from this point
+- `docs/PCB_CLASS_MAPPING.md`: unified PCB class naming and alias rules
+- `docs/PCB迁移与EPFA说明.md`: PCB migration rationale, EPFA design, and experiment notes

@@ -218,6 +218,93 @@
 
 ### 你可以学到什么
 
+## 2026-04-15 第十步：迁移到 PCB 检测主线
+
+### 做了什么
+
+- 新增 PCB 通用数据准备核心 [src/yolodist/data/pcb_detection.py](/root/workspace/yolodist/src/yolodist/data/pcb_detection.py)
+- 新增统一脚本 [tools/prepare_pcb_detection.py](/root/workspace/yolodist/tools/prepare_pcb_detection.py)
+- 新增 DeepPCB 下载脚本 [tools/download_deeppcb_from_github.py](/root/workspace/yolodist/tools/download_deeppcb_from_github.py)
+- 新增三份数据配置：
+  - [configs/data/deeppcb.toml](/root/workspace/yolodist/configs/data/deeppcb.toml)
+  - [configs/data/pku_market_pcb.toml](/root/workspace/yolodist/configs/data/pku_market_pcb.toml)
+  - [configs/data/dspcbsd_plus.toml](/root/workspace/yolodist/configs/data/dspcbsd_plus.toml)
+- 新增类别映射文档 [docs/PCB_CLASS_MAPPING.md](/root/workspace/yolodist/docs/PCB_CLASS_MAPPING.md)
+- 扩展了 [tools/preflight_check.py](/root/workspace/yolodist/tools/preflight_check.py)，现在能检查处理后数据集的空标签比例、坏图和类别越界。
+
+### 为什么要这么做
+
+- MVTec 转检测的指标说明这条路不适合作为当前阶段主实验。
+- PCB 数据天然是检测任务，更适合用统一的 YOLO 训练与评估流程产出论文指标。
+- 三个 PCB 数据集的原始格式不一定一致，所以准备脚本必须做成“自动探测布局”而不是把路径写死。
+
+### 你可以学到什么
+
+- 数据迁移最怕“只为一套数据写死逻辑”，那样第二套数据一来就要重写。
+- 提前把 alias 映射和一致性检查做好，后面调模型时就更容易把问题归因到模型而不是数据。
+
+## 2026-04-15 第十一步：落地 EPFA-Lite
+
+### 做了什么
+
+- 新增模块实现 [src/yolodist/models/epfa.py](/root/workspace/yolodist/src/yolodist/models/epfa.py)
+- 更新注册入口 [src/yolodist/models/registry.py](/root/workspace/yolodist/src/yolodist/models/registry.py)
+- 新增模型配置 [configs/models/yolo11_student_epfa.yaml](/root/workspace/yolodist/configs/models/yolo11_student_epfa.yaml)
+- 在 train / eval / distill runner 里增加了轻量上下文 hook，使 EPFA 能读取当前输入图像的 Sobel 边缘先验。
+
+### 为什么要这么做
+
+- PCB 缺陷里常见细边缘、断裂、缺口、毛刺，小目标和边缘提示比重型全局建模更重要。
+- 直接上 Transformer 风险太高，不符合“结果第一，创新第二”的节奏。
+- EPFA 把 ECA 风格通道门控和固定 Sobel 先验组合在一起，参数增量可控，也方便写消融。
+
+### 你可以学到什么
+
+- 创新模块不一定要追求复杂，关键是要和任务特征有明确对应关系。
+- 当模块需要访问原始输入图像时，局部 hook 往往比重写训练框架更稳。
+
+## 2026-04-15 第十二步：补全 PCB 实验矩阵和论文表导出
+
+### 做了什么
+
+- 新增 `DeepPCB / PKU-Market-PCB / DsPCBSD+` 的 baseline、plain、EPFA、distill plain、distill EPFA 配置。
+- 新增统一执行脚本 [tools/run_pcb_pipeline.sh](/root/workspace/yolodist/tools/run_pcb_pipeline.sh)
+- 扩展 [tools/summarize_run.py](/root/workspace/yolodist/tools/summarize_run.py)，可以生成：
+  - `runs/paper_tables/pcb_main_results.csv`
+  - `runs/paper_tables/pcb_ablation.csv`
+
+### 为什么要这么做
+
+- 一套论文实验如果没有统一配置和统一导表，很容易最后手工抄错结果。
+- 把四组主实验固定下来后，后续就能专注于“哪组提升了、为什么提升”。
+
+### 你可以学到什么
+
+- 真正节省时间的不是少跑几组实验，而是把每组实验的入口和输出约束成一致格式。
+- 提前把汇总表做好，会显著降低后面写论文时的认知负担。
+
+## 2026-04-15 第十三步：开始真实 PCB 实验并建立论文记录
+
+### 做了什么
+
+- 新增实验记录文档 [docs/PCB实验记录.md](/root/workspace/yolodist/docs/PCB实验记录.md)
+- 把三个数据集的实际接入状态写成了可追溯记录：
+  - `DeepPCB`
+  - `PKU-Market-PCB`
+  - `DsPCBSD+`
+- 启动了第一条真实训练任务：`DsPCBSD+ baseline_plain`
+
+### 为什么要这么做
+
+- 你后面写毕业论文时，不只需要最终分数，还需要“中间是怎么推进的、遇到了什么问题、为什么这么设计”。
+- 如果只保存最终权重和结果图，后面很容易忘记数据是怎么拆分、模块是什么时候插进去的、某次实验为什么停掉。
+- 单独维护一份实验记录，可以把工程推进过程转化成论文里的方法与实验叙事。
+
+### 你可以学到什么
+
+- 研究项目里的记录不是附属工作，而是结果可信度的一部分。
+- 越早把“命令、配置、结论”同步下来，后面写论文越轻松。
+
 - 在实验项目里，“能训练”只是第一步，“能评估、能对比、能复盘”才是完整链路。
 - 很多时候，一个小的结果汇总脚本，能在后期节省大量整理实验表格的时间。
 

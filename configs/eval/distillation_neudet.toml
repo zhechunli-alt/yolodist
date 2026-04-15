@@ -1,0 +1,9 @@
+[eval]
+model = "runs/neudet_distill/yolo11_student_distill/weights/best.pt"
+data = "datasets/processed/neudet_detection/data.yaml"
+split = "test"
+project = "runs/neudet_distill"
+name = "distill_eval"
+imgsz = 640
+batch = 16
+device = "0"

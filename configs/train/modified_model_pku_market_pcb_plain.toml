@@ -1,0 +1,13 @@
+[train]
+model = "configs/models/yolo11_student_plain.yaml"
+pretrained = "weights/yolo11n.pt"
+data = "datasets/processed/pku_market_pcb_detection/data.yaml"
+project = "runs/pku_market_pcb_modified"
+name = "student_plain"
+epochs = 100
+imgsz = 640
+batch = 16
+device = "0"
+workers = 4
+seed = 42
+exist_ok = true

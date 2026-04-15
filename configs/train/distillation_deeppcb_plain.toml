@@ -1,0 +1,26 @@
+[distill]
+teacher_weights = "weights/teacher_deeppcb.pt"
+student_model = "configs/models/yolo11_student_plain.yaml"
+student_pretrained = "weights/yolo11n.pt"
+prepared_data = "datasets/processed/deeppcb_detection/data.yaml"
+pseudo_dataset_dir = "datasets/processed/deeppcb_detection_distill_plain"
+teacher_conf = 0.25
+label_strategy = "merge_teacher"
+teacher_iou_threshold = 0.5
+teacher_max_det = 100
+distill_temperature = 4.0
+distill_alpha = 0.2
+enable_kd_loss = true
+enable_feature_kd_loss = false
+feature_kd_alpha = 0.0
+feature_kd_layers = [15, 18, 21]
+teacher_feature_kd_layers = [15, 18, 21]
+project = "runs/deeppcb_distill"
+name = "distill_plain"
+epochs = 80
+imgsz = 640
+batch = 16
+device = "0"
+workers = 4
+seed = 42
+exist_ok = true

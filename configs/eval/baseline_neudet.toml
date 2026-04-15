@@ -1,0 +1,9 @@
+[eval]
+model = "runs/neudet_baseline/yolo11n_baseline/weights/best.pt"
+data = "datasets/processed/neudet_detection/data.yaml"
+split = "test"
+project = "runs/neudet_baseline"
+name = "baseline_eval"
+imgsz = 640
+batch = 16
+device = "0"

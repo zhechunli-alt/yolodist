@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from yolodist.config import load_toml
-from yolodist.models.registry import register_ultralytics_modules
+from yolodist.models.registry import initialize_custom_model_context, register_ultralytics_modules
 from yolodist.paths import ROOT
 from yolodist.reporting.manifest import write_run_manifest
 
@@ -36,6 +36,7 @@ def run_train(config_path: Path) -> None:
     )
 
     model = YOLO(str(model_path))
+    initialize_custom_model_context(model.model)
     train_kwargs = {
         "data": str(data_path),
         "project": str(ROOT / config["project"]),
@@ -50,6 +51,12 @@ def run_train(config_path: Path) -> None:
     }
     if "pretrained" in config:
         train_kwargs["pretrained"] = str(ROOT / config["pretrained"])
+    if "optimizer" in config:
+        train_kwargs["optimizer"] = str(config["optimizer"])
+    if "lr0" in config:
+        train_kwargs["lr0"] = float(config["lr0"])
+    if "momentum" in config:
+        train_kwargs["momentum"] = float(config["momentum"])
     model.train(
         **train_kwargs
     )
@@ -68,6 +75,7 @@ def run_predict(model_path: Path, image_path: Path, project: Path, name: str) ->
     register_ultralytics_modules()
 
     model = YOLO(str(model_path))
+    initialize_custom_model_context(model.model)
     model(str(image_path), save=True, project=str(project), name=name)
 
 

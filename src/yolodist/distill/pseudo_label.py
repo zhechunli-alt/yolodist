@@ -6,7 +6,7 @@ import shutil
 from typing import Any
 
 from yolodist.config import load_toml
-from yolodist.models.registry import register_ultralytics_modules
+from yolodist.models.registry import initialize_custom_model_context, register_ultralytics_modules
 from yolodist.paths import ROOT
 from yolodist.reporting.manifest import write_run_manifest
 
@@ -16,6 +16,8 @@ def run_distillation(config_path: Path) -> None:
     alpha = float(config.get("distill_alpha", 0.0))
     temperature = float(config.get("distill_temperature", 1.0))
     enable_kd_loss = bool(config.get("enable_kd_loss", True))
+    enable_feature_kd_loss = bool(config.get("enable_feature_kd_loss", False))
+    feature_kd_alpha = float(config.get("feature_kd_alpha", 0.0))
     try:
         from ultralytics import YOLO
     except ImportError as exc:
@@ -67,12 +69,17 @@ def run_distillation(config_path: Path) -> None:
     )
 
     student = YOLO(str(student_model))
+    initialize_custom_model_context(student.model)
     if enable_kd_loss and alpha > 0.0:
         attach_response_kd_loss(
             student_yolo=student,
             teacher_weights=teacher_weights,
             alpha=alpha,
             temperature=temperature,
+            enable_feature_kd_loss=enable_feature_kd_loss,
+            feature_kd_alpha=feature_kd_alpha,
+            feature_kd_layers=list(config.get("feature_kd_layers", [15, 18, 21])),
+            teacher_feature_kd_layers=list(config.get("teacher_feature_kd_layers", config.get("feature_kd_layers", [15, 18, 21]))),
         )
     train_kwargs = {
         "data": str(pseudo_dataset_dir / "data.yaml"),
@@ -88,6 +95,12 @@ def run_distillation(config_path: Path) -> None:
     }
     if "student_pretrained" in config:
         train_kwargs["pretrained"] = str(ROOT / config["student_pretrained"])
+    if "optimizer" in config:
+        train_kwargs["optimizer"] = str(config["optimizer"])
+    if "lr0" in config:
+        train_kwargs["lr0"] = float(config["lr0"])
+    if "momentum" in config:
+        train_kwargs["momentum"] = float(config["momentum"])
     student.train(
         **train_kwargs
     )
@@ -261,7 +274,16 @@ def to_xyxy(x: float, y: float, w: float, h: float) -> tuple[float, float, float
     return x - half_w, y - half_h, x + half_w, y + half_h
 
 
-def attach_response_kd_loss(student_yolo, teacher_weights: Path, alpha: float, temperature: float) -> None:
+def attach_response_kd_loss(
+    student_yolo,
+    teacher_weights: Path,
+    alpha: float,
+    temperature: float,
+    enable_feature_kd_loss: bool = False,
+    feature_kd_alpha: float = 0.0,
+    feature_kd_layers: list[int] | None = None,
+    teacher_feature_kd_layers: list[int] | None = None,
+) -> None:
     """Attach response-level KD loss into student model.loss.
 
     The merged objective becomes:
@@ -278,17 +300,25 @@ def attach_response_kd_loss(student_yolo, teacher_weights: Path, alpha: float, t
 
     teacher_yolo = YOLO(str(teacher_weights))
     teacher_model = teacher_yolo.model
+    initialize_custom_model_context(teacher_model)
     teacher_model.eval()
     for param in teacher_model.parameters():
         param.requires_grad_(False)
 
     student_model = student_yolo.model
+    initialize_custom_model_context(student_model)
     base_loss_fn = student_model.loss
     state: dict[str, Any] = {"teacher_device": None}
+    feature_state = build_feature_kd_state(
+        student_model=student_model,
+        teacher_model=teacher_model,
+        student_layers=feature_kd_layers or [15, 18, 21],
+        teacher_layers=teacher_feature_kd_layers or feature_kd_layers or [15, 18, 21],
+    )
 
     def kd_wrapped_loss(batch, preds=None):
         det_loss, det_items = base_loss_fn(batch, preds)
-        student_preds = preds if preds is not None else student_model(batch["img"])
+        student_preds = student_model(batch["img"])
         kd_loss = response_kd_loss(
             student_preds=student_preds,
             teacher_model=teacher_model,
@@ -298,6 +328,8 @@ def attach_response_kd_loss(student_yolo, teacher_weights: Path, alpha: float, t
             mse_fn=F.mse_loss,
         )
         total = (1.0 - alpha) * det_loss + alpha * kd_loss
+        if enable_feature_kd_loss and feature_kd_alpha > 0.0:
+            total = total + feature_kd_alpha * feature_kd_loss(feature_state, mse_fn=F.mse_loss, device=batch["img"].device)
         return total, det_items
 
     student_model.loss = kd_wrapped_loss
@@ -340,3 +372,57 @@ def extract_pred_tensors(preds) -> list:
     if hasattr(preds, "shape") and getattr(preds, "ndim", 0) == 4:
         tensors.append(preds)
     return tensors
+
+
+def build_feature_kd_state(student_model, teacher_model, student_layers: list[int], teacher_layers: list[int]) -> dict[str, Any]:
+    state: dict[str, Any] = {
+        "student": {},
+        "teacher": {},
+        "hooks": [],
+        "student_layers": list(student_layers),
+        "teacher_layers": list(teacher_layers),
+    }
+
+    for store_key, model, layer_ids in (
+        ("student", student_model, student_layers),
+        ("teacher", teacher_model, teacher_layers),
+    ):
+        module_list = getattr(model, "model", None)
+        if module_list is None:
+            continue
+        for layer_id in layer_ids:
+            if not (0 <= layer_id < len(module_list)):
+                continue
+            module = module_list[layer_id]
+
+            def save_output(_, __, output, *, _store_key=store_key, _layer_id=layer_id):
+                state[_store_key][_layer_id] = output
+
+            state["hooks"].append(module.register_forward_hook(save_output))
+    return state
+
+
+def feature_kd_loss(feature_state: dict[str, Any], mse_fn, device) -> "torch.Tensor":
+    import torch
+
+    student_layers = feature_state.get("student_layers", [])
+    teacher_layers = feature_state.get("teacher_layers", [])
+    if not student_layers or not teacher_layers:
+        return torch.zeros((), device=device)
+
+    total = torch.zeros((), device=device)
+    pair_count = 0
+    for student_layer, teacher_layer in zip(student_layers, teacher_layers, strict=False):
+        student_feat = feature_state["student"].get(student_layer)
+        teacher_feat = feature_state["teacher"].get(teacher_layer)
+        if student_feat is None or teacher_feat is None:
+            continue
+        if not hasattr(student_feat, "shape") or not hasattr(teacher_feat, "shape"):
+            continue
+        if student_feat.shape != teacher_feat.shape:
+            continue
+        total = total + mse_fn(student_feat, teacher_feat.detach())
+        pair_count += 1
+    if pair_count == 0:
+        return torch.zeros((), device=device)
+    return total / float(pair_count)

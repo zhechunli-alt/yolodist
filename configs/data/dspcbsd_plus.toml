@@ -1,0 +1,19 @@
+[dataset]
+name = "dspcbsd_plus"
+source_dir = "datasets/dspcbsd_plus"
+output_dir = "datasets/processed/dspcbsd_plus_detection"
+split_seed = 42
+val_ratio = 0.1
+test_ratio = 0.2
+copy_images = true
+classes = [
+  "short",
+  "spur",
+  "spurious_copper",
+  "open",
+  "mousebite",
+  "hole_breakout",
+  "conductor_scratch",
+  "conductor_foreign_object",
+  "base_material_foreign_object",
+]

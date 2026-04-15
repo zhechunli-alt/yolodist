@@ -1,0 +1,12 @@
+[train]
+model = "weights/yolo11n.pt"
+data = "datasets/processed/pku_market_pcb_detection/data.yaml"
+project = "runs/pku_market_pcb_baseline"
+name = "baseline_plain"
+epochs = 100
+imgsz = 640
+batch = 16
+device = "0"
+workers = 4
+seed = 42
+exist_ok = true

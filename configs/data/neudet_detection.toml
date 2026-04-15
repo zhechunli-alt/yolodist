@@ -1,0 +1,14 @@
+[dataset]
+source_dir = "datasets/neudet"
+output_dir = "datasets/processed/neudet_detection"
+seed = 42
+copy_images = true
+annotation_format = "auto"
+image_dir_name = "IMAGES"
+annotation_dir_name = "ANNOTATIONS"
+classes = ["crazing", "inclusion", "patches", "pitted_surface", "rolled-in_scale", "scratches"]
+
+[splits]
+train = 0.7
+val = 0.15
+test = 0.15

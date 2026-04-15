@@ -1,0 +1,9 @@
+[eval]
+model = "runs/distill_epfa/yolo11_student_epfa_distill/weights/best.pt"
+data = "datasets/processed/mvtec_detection/data.yaml"
+split = "test"
+project = "runs/distill_epfa"
+name = "distill_epfa_eval"
+imgsz = 640
+batch = 16
+device = "0"

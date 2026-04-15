@@ -4,7 +4,7 @@ from pathlib import Path
 import json
 
 from yolodist.config import load_toml
-from yolodist.models.registry import register_ultralytics_modules
+from yolodist.models.registry import initialize_custom_model_context, register_ultralytics_modules
 from yolodist.paths import ROOT
 from yolodist.reporting.manifest import write_run_manifest
 
@@ -35,6 +35,7 @@ def run_eval(config_path: Path) -> Path:
     )
 
     model = YOLO(str(model_path))
+    initialize_custom_model_context(model.model)
     metrics = model.val(
         data=str(data_path),
         split=str(config.get("split", "test")),
