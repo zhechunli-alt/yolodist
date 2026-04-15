@@ -135,7 +135,7 @@
   - 参数增量远低于 `0.3M` 限制
   - 满足轻量化约束，可进入正式消融
 
-## 五、正在运行的实验
+## 五、实验执行记录
 
 ### 2026-04-15 DsPCBSD+ baseline_plain
 
@@ -164,7 +164,7 @@ PYTHONPATH=src python experiments/baseline/train.py --config configs/train/basel
 
 ### 2026-04-15 DeepPCB baseline_plain
 
-- 状态：`进行中`
+- 状态：`已完成训练 / 已完成 test 评估 / 已生成 teacher`
 - 配置：
   - [configs/train/baseline_deeppcb.toml](/root/workspace/yolodist/configs/train/baseline_deeppcb.toml)
 - 命令：
@@ -185,7 +185,7 @@ PYTHONPATH=src python experiments/baseline/train.py --config configs/train/basel
   - 已创建 `train.cache`
 - 当前判断：
   - DeepPCB baseline 已具备完整训练条件
-  - 接下来可直接作为 teacher 基线使用
+  - 可直接作为 teacher 基线使用
 - 早期训练信号：
   - `epoch 4` 验证约为：
     - `precision = 0.7550`
@@ -203,6 +203,152 @@ PYTHONPATH=src python experiments/baseline/train.py --config configs/train/basel
   - 进一步说明：
     - DeepPCB 基线在 10 个 epoch 内已显示出较强的可分性
     - 后续 `student_plain` 和 `student_epfa` 有较明确的对比价值
+- 训练完成情况：
+  - 训练目录：`runs/deeppcb_baseline/baseline_plain/`
+  - 教师权重：`weights/teacher_deeppcb.pt`
+- test 评估：
+  - 评估目录：`runs/deeppcb_baseline/baseline_plain_eval2/`
+  - 指标：
+    - `precision = 0.9615`
+    - `recall = 0.9484`
+    - `mAP50 = 0.9755`
+    - `mAP50-95 = 0.7492`
+- 记录结论：
+  - `baseline_plain` 是当前 DeepPCB 最强参考线
+  - 该结果来自测试集，不是仅验证集结果
+
+### 2026-04-15 DeepPCB student_plain
+
+- 状态：`已完成训练 / 已完成 test 评估`
+- 配置：
+  - [configs/train/modified_model_deeppcb_plain.toml](/root/workspace/yolodist/configs/train/modified_model_deeppcb_plain.toml)
+  - [configs/eval/modified_model_deeppcb_plain.toml](/root/workspace/yolodist/configs/eval/modified_model_deeppcb_plain.toml)
+- 命令：
+
+```bash
+source /root/workspace/.venv/bin/activate
+PYTHONPATH=src python experiments/modified_model/train.py --config configs/train/modified_model_deeppcb_plain.toml
+PYTHONPATH=src python experiments/modified_model/evaluate.py --config configs/eval/modified_model_deeppcb_plain.toml
+```
+
+- 训练目录：`runs/deeppcb_modified/student_plain/`
+- test 评估目录：`runs/deeppcb_modified/student_plain_eval2/`
+- test 指标：
+  - `precision = 0.9449`
+  - `recall = 0.8758`
+  - `mAP50 = 0.9405`
+  - `mAP50-95 = 0.6247`
+- 记录结论：
+  - 轻量化学生模型能在 DeepPCB 上稳定工作
+  - 但相较 `baseline_plain` 存在明显性能损失
+  - 该组可作为 EPFA 与蒸馏的直接对照组
+
+### 2026-04-15 DeepPCB student_epfa
+
+- 状态：`已完成训练 / 已完成 test 评估`
+- 配置：
+  - [configs/train/modified_model_deeppcb_epfa.toml](/root/workspace/yolodist/configs/train/modified_model_deeppcb_epfa.toml)
+  - [configs/eval/modified_model_deeppcb_epfa.toml](/root/workspace/yolodist/configs/eval/modified_model_deeppcb_epfa.toml)
+- 命令：
+
+```bash
+source /root/workspace/.venv/bin/activate
+PYTHONPATH=src python experiments/modified_model/train.py --config configs/train/modified_model_deeppcb_epfa.toml
+PYTHONPATH=src python experiments/modified_model/evaluate.py --config configs/eval/modified_model_deeppcb_epfa.toml
+```
+
+- 训练目录：`runs/deeppcb_epfa/student_epfa/`
+- test 评估目录：`runs/deeppcb_epfa/student_epfa_eval2/`
+- test 指标：
+  - `precision = 0.9500`
+  - `recall = 0.9134`
+  - `mAP50 = 0.9619`
+  - `mAP50-95 = 0.6678`
+- 与 `student_plain(test)` 对比增量：
+  - `precision +0.0051`
+  - `recall +0.0376`
+  - `mAP50 +0.0214`
+  - `mAP50-95 +0.0431`
+- 记录结论：
+  - `EPFA-Lite` 在 DeepPCB 测试集上带来真实提升
+  - 提升最明显的是 `Recall` 和 `mAP50-95`
+  - 当前已满足“至少一个数据集有可见提升”的验收目标
+
+### 2026-04-15 DeepPCB distill_plain
+
+- 状态：`已完成训练 / 已完成 test 评估`
+- 配置：
+  - [configs/train/distillation_deeppcb_plain.toml](/root/workspace/yolodist/configs/train/distillation_deeppcb_plain.toml)
+  - [configs/eval/distillation_deeppcb_plain.toml](/root/workspace/yolodist/configs/eval/distillation_deeppcb_plain.toml)
+- 命令：
+
+```bash
+source /root/workspace/.venv/bin/activate
+PYTHONPATH=src python experiments/distillation/train.py --config configs/train/distillation_deeppcb_plain.toml
+```
+
+- 训练目录：`runs/deeppcb_distill/distill_plain/`
+- 训练结束后 best checkpoint 验证指标：
+  - `precision = 0.901`
+  - `recall = 0.903`
+  - `mAP50 = 0.957`
+  - `mAP50-95 = 0.646`
+- test 评估目录：`runs/deeppcb_distill/distill_plain_eval2/`
+- test 指标：
+  - `precision = 0.9111`
+  - `recall = 0.8673`
+  - `mAP50 = 0.9290`
+  - `mAP50-95 = 0.5920`
+- 与 `student_plain(test)` 对比增量：
+  - `precision -0.0338`
+  - `recall -0.0085`
+  - `mAP50 -0.0115`
+  - `mAP50-95 -0.0327`
+- 记录结论：
+  - 这版 `distill_plain` 在 DeepPCB 测试集上未优于 `student_plain`
+  - 说明当前 `plain student + KD` 组合并不稳定
+  - 后续若要保留蒸馏主线，应优先观察 `distill_epfa` 是否更适合承接 teacher 知识
+- 备注：
+  - 本轮为 `80 epoch` 初筛结果
+  - 为保证与其他组公平，后续将统一补跑 `100 epoch` 版本
+
+### 2026-04-15 DeepPCB distill_plain（100 epoch 统一口径重跑）
+
+- 状态：`已完成训练 / 已完成 test 评估`
+- 配置：
+  - [configs/train/distillation_deeppcb_plain.toml](/root/workspace/yolodist/configs/train/distillation_deeppcb_plain.toml)
+  - [configs/eval/distillation_deeppcb_plain.toml](/root/workspace/yolodist/configs/eval/distillation_deeppcb_plain.toml)
+- 训练目录：`runs/deeppcb_distill/distill_plain/`
+- test 评估目录：`runs/deeppcb_distill/distill_plain_eval2/`
+- test 指标：
+  - `precision = 0.9449`
+  - `recall = 0.8758`
+  - `mAP50 = 0.9405`
+  - `mAP50-95 = 0.6247`
+- 与 `student_plain(test)` 对比：
+  - 指标完全一致
+- 记录结论：
+  - 在统一 `100 epoch` 口径下，`distill_plain` 未体现出蒸馏增益
+  - 当前 `plain student + KD` 近似退化为普通 student 训练
+
+### 2026-04-15 DeepPCB distill_epfa（100 epoch）
+
+- 状态：`已完成训练 / 已完成 test 评估`
+- 配置：
+  - [configs/train/distillation_deeppcb_epfa.toml](/root/workspace/yolodist/configs/train/distillation_deeppcb_epfa.toml)
+  - [configs/eval/distillation_deeppcb_epfa.toml](/root/workspace/yolodist/configs/eval/distillation_deeppcb_epfa.toml)
+- 训练目录：`runs/deeppcb_distill_epfa/distill_epfa/`
+- test 评估目录：`runs/deeppcb_distill_epfa/distill_epfa_eval2/`
+- test 指标：
+  - `precision = 0.9500`
+  - `recall = 0.9134`
+  - `mAP50 = 0.9619`
+  - `mAP50-95 = 0.6678`
+- 与 `student_epfa(test)` 对比：
+  - 指标完全一致
+- 记录结论：
+  - 在统一 `100 epoch` 口径下，`distill_epfa` 未体现出额外蒸馏增益
+  - 当前应优先将论文主结论聚焦为 `EPFA` 对轻量学生有效，而非蒸馏有效
 
 ## 六、后续实验就绪状态
 
@@ -216,19 +362,37 @@ PYTHONPATH=src python experiments/baseline/train.py --config configs/train/basel
 
 ### DeepPCB distill_plain / distill_epfa
 
-- 状态：`配置与数据已就绪`
-- 当前唯一阻塞：
-  - `weights/teacher_deeppcb.pt` 尚未生成
+- 状态：`distill_plain 已完成训练 / distill_epfa 可立即启动`
 - 说明：
-  - baseline 完成后复制 `best.pt -> teacher_deeppcb.pt` 即可启动
+  - `teacher_deeppcb.pt` 已生成
+  - 已决定把蒸馏实验统一改为 `100 epoch`
+  - `80 epoch` 结果保留作为第一轮筛选记录
 
 ## 七、下一步
 
-1. 等 `DsPCBSD+ baseline` 产出 teacher 权重
-2. 立即启动 `DeepPCB baseline_plain`
-3. DeepPCB baseline 完成后，优先跑：
-   - `student_plain`
-   - `student_epfa`
-4. 如果 `student_epfa > student_plain`，再进入：
-   - `distill_plain`
-   - `distill_epfa`
+1. DeepPCB 主表已基本稳定，开始推进 `PKU-Market-PCB baseline`
+2. 完成 `PKU-Market-PCB` 的 `student_plain / student_epfa`
+3. 视情况再决定是否继续保留蒸馏为主表项目
+4. DeepPCB / PKU 主表稳定后，复制到：
+   - `PKU-Market-PCB`
+   - `DsPCBSD+`
+
+### 2026-04-15 PKU-Market-PCB baseline_plain
+
+- 状态：`已启动训练`
+- 配置：
+  - [configs/train/baseline_pku_market_pcb.toml](/root/workspace/yolodist/configs/train/baseline_pku_market_pcb.toml)
+- 命令：
+
+```bash
+source /root/workspace/.venv/bin/activate
+PYTHONPATH=src python experiments/baseline/train.py --config configs/train/baseline_pku_market_pcb.toml
+```
+
+- 启动观察：
+  - 数据扫描正常：
+    - `train = 555`
+    - `val = 46`
+    - `corrupt = 0`
+  - `nc = 6` 覆盖正确
+  - 已进入 `epoch 1`

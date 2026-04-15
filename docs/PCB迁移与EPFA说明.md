@@ -78,6 +78,68 @@
 - mAP50-95
 - Recall
 
+## 模型关系与训练来源说明
+
+这部分用于明确 `baseline_plain`、`student_plain`、`student_epfa`、`distill_plain`、`distill_epfa` 的关系，避免在论文写作时把“学生模型结构”和“蒸馏训练结果”混在一起。
+
+### 1. baseline_plain
+
+- 指标准 `YOLO11n` 基线模型
+- 使用原始训练数据和真实标签做普通监督训练
+- 训练完成后得到一个性能较强的检测模型
+- 这个模型既是基线参考，也是后续蒸馏阶段的 `teacher`
+
+### 2. student_plain
+
+- 指轻量学生模型结构，不带 `EPFA`
+- 同样使用原始训练数据和真实标签做普通监督训练
+- 这是“只做轻量化、不加蒸馏、不加创新模块”的对照组
+
+### 3. student_epfa
+
+- 指加入 `EPFA-Lite` 的轻量学生模型结构
+- 同样使用原始训练数据和真实标签做普通监督训练
+- 这是“轻量化 + PCB 领域导向模块”的改进组
+
+### 4. distill_plain
+
+- 学生结构仍然是 `student_plain`
+- 但训练时不再只依赖真实标签
+- 而是在原始训练数据上，同时使用：
+  - 真实标签监督
+  - `baseline_plain` 提供的 teacher 指导
+- 因此 `distill_plain` 不是“在 `student_plain` checkpoint 上继续微调”的概念，而是“使用同一学生结构，重新进行一条蒸馏训练线后得到的模型”
+
+### 5. distill_epfa
+
+- 学生结构仍然是 `student_epfa`
+- 训练时同样在原始训练数据上，同时使用：
+  - 真实标签监督
+  - `baseline_plain` 提供的 teacher 指导
+- 因此 `distill_epfa` 也是一条独立蒸馏训练线的最终模型，而不是简单从 `student_epfa` 继续训练得到
+
+### 一句话总结
+
+- `student_plain / student_epfa`：普通监督训练得到的学生模型
+- `distill_plain / distill_epfa`：在相同原始数据上，引入 teacher 指导后重新训练得到的学生模型
+
+### 关系示意
+
+```text
+原始数据 + 真实标签 ------------------------> student_plain
+原始数据 + 真实标签 ------------------------> student_epfa
+
+baseline_plain 作为 teacher
+
+原始数据 + 真实标签 + teacher指导 ----------> distill_plain
+原始数据 + 真实标签 + teacher指导 ----------> distill_epfa
+```
+
+写作时建议区分两层概念：
+
+- `student_plain / student_epfa` 表示学生模型结构或普通训练结果
+- `distill_plain / distill_epfa` 表示对应学生结构经过蒸馏训练后的最终模型
+
 ## 失败案例与风险点
 
 - `PKU-Market-PCB` 的公开下载入口依赖外部分发站点，自动化下载稳定性较弱。
