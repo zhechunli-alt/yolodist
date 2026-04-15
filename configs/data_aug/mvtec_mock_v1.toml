@@ -1,0 +1,49 @@
+[dataset]
+name = "mvtec"
+version = "mvtec_mock_v1"
+output_dir = "datasets/synthetic/mvtec_mock_v1"
+seed = 42
+overwrite = true
+
+[prompt]
+style_hint = "industrial inspection photo, neutral background"
+severities = ["minor", "moderate", "severe"]
+default_samples_per_severity = 4
+
+[generator]
+provider = "mock"
+image_width = 640
+image_height = 640
+
+[quality]
+mock_min = 0.45
+mock_max = 0.98
+auto_accept_threshold = 0.65
+filter_threshold = 0.68
+manual_review_sample_size = 40
+manual_review_band_width = 0.08
+
+[[defects]]
+category = "bottle"
+class_id = 0
+defect_types = ["broken_large", "contamination", "scratch"]
+
+[[defects]]
+category = "cable"
+class_id = 0
+defect_types = ["bent_wire", "poke_insulation", "cut_outer_insulation"]
+
+[[defects]]
+category = "capsule"
+class_id = 0
+defect_types = ["crack", "squeeze", "faulty_imprint"]
+
+[[defects]]
+category = "metal_nut"
+class_id = 0
+defect_types = ["scratch", "thread_damage", "contamination"]
+
+[[defects]]
+category = "hazelnut"
+class_id = 0
+defect_types = ["crack", "hole", "print"]

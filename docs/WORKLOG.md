@@ -527,3 +527,110 @@
 
 - 当实验链路变长后，自动化脚本是保障复现性和执行效率的关键。
 - 先把流程固化，再做算法对比，能显著降低实验管理成本。
+
+## 2026-04-15 第十七步：新增并行工作步骤文档（训练外协同）
+
+### 做了什么
+
+- 新增并行协作文档：
+  - [并行工作步骤文档.md](/Users/lizhechun/Desktop/yolodist/docs/并行工作步骤文档.md)
+- 文档包含：
+  - 线程拆分（A~E）
+  - 输入输出接口契约
+  - 固定产物路径与字段定义
+  - 后端 API 最小接口约定
+  - Git 分支和合并规范
+  - 每日同步模板建议
+
+### 为什么要这么做
+
+- 主线程在训练时，如果没有并行协作规范，其他线程容易做重复或冲突工作。
+- 先定义“接口与产物契约”，可以让数据、后端、部署、报告线程同步推进，不互相阻塞。
+- 这样训练结果出来后可以直接接到报告和系统，不需要返工。
+
+### 你可以学到什么
+
+- 多线程协作的关键不是“多开几个任务”，而是先约定清晰的数据和接口边界。
+- 研究工程中，接口契约和目录契约能显著降低跨模块联调成本。
+
+## 2026-04-15 第十八步：完成线程C后端最小可用实现（Flask + 模型管理 + SQLite）
+
+### 做了什么
+
+- 新增后端服务目录与核心模块：
+  - [service/backend/app.py](/Users/lizhechun/Desktop/yolodist/service/backend/app.py)
+  - [service/backend/infer.py](/Users/lizhechun/Desktop/yolodist/service/backend/infer.py)
+  - [service/backend/model_registry.py](/Users/lizhechun/Desktop/yolodist/service/backend/model_registry.py)
+- 按契约实现 5 个 API：
+  1. `GET /api/v1/health`
+  2. `POST /api/v1/infer`
+  3. `GET /api/v1/models`
+  4. `POST /api/v1/models/switch`
+  5. `GET /api/v1/stats/summary`
+- 推理日志落库 SQLite：
+  - 自动初始化 `service/backend/data/inference_logs.db`
+  - 记录请求状态、模型名、耗时、错误信息
+- 模型注册表按统一产物名对接：
+  1. `weights/best_teacher.pt`
+  2. `weights/best_student_plain.pt`
+  3. `weights/best_student_ppla.pt`
+  4. `weights/best_student_distill.pt`
+- 更新文档与依赖：
+  - [README.md](/Users/lizhechun/Desktop/yolodist/README.md) 增加后端启动与接口说明
+  - [requirements.txt](/Users/lizhechun/Desktop/yolodist/requirements.txt) 增加 `Flask>=3.0.0`
+
+### 为什么要这么做
+
+- 你的选题中明确包含“后端服务开发、模型管理、检测记录与统计”，线程C就是这部分的最小落地。
+- 先做 PyTorch 推理接口并稳定契约，后续替换 TensorRT 引擎时可以不改前端和调用方。
+- 提前把模型切换和统计接口打通，能让第8~11阶段（部署优化、前端、联调）并行推进。
+
+### 你可以学到什么
+
+- 在工程落地中，先固定 API 与日志契约，再优化推理后端，可以最大化减少返工。
+- 把“模型注册 + 推理执行 + 统计记录”拆成独立模块，会显著提升后续可维护性。
+
+## 2026-04-15 第十九步：补齐线程C落地工具（权重同步 + 后端预检查）
+
+### 做了什么
+
+- 新增权重标准化同步脚本：
+  - [tools/sync_standard_weights.py](/Users/lizhechun/Desktop/yolodist/tools/sync_standard_weights.py)
+  - 功能：从 `runs/baseline|modified|distill` 自动寻找最新 `weights/best.pt`，复制到 `weights/` 标准命名。
+- 新增后端预检查脚本：
+  - [tools/backend_preflight.py](/Users/lizhechun/Desktop/yolodist/tools/backend_preflight.py)
+  - 检查项：`flask`/`ultralytics` 依赖、标准权重可用数量（至少 2 个用于模型切换验证）。
+- 更新使用文档：
+  - [README.md](/Users/lizhechun/Desktop/yolodist/README.md)
+  - 增加“同步权重 -> 预检查 -> 启动服务”的最短执行路径。
+
+### 为什么要这么做
+
+- 当前服务已经可运行，但训练产物到服务标准权重名之间仍有人工步骤，容易出错。
+- 在你论文节奏里，后端通常会和训练并行推进，预检查能提前暴露“缺依赖/缺权重”的阻塞点。
+
+### 你可以学到什么
+
+- 工程化里，脚本化“最后一公里”比手工操作更重要，能显著提升联调成功率。
+- 把运行前检查做成独立命令，是后续部署到服务器和容器的基础能力。
+
+## 2026-04-15 第二十步：新增后端演示权重快速引导工具（联调加速）
+
+### 做了什么
+
+- 新增演示权重引导脚本：
+  - [tools/bootstrap_backend_weights.py](/Users/lizhechun/Desktop/yolodist/tools/bootstrap_backend_weights.py)
+  - 功能：将一个已有 `.pt`（如 `weights/yolo11n.pt`）复制为 4 个标准后端权重名，快速通过接口联调。
+- 更新文档：
+  - [README.md](/Users/lizhechun/Desktop/yolodist/README.md)
+  - 增加“同步权重 / 演示引导 / 预检查 / 启动服务”的顺序说明。
+
+### 为什么要这么做
+
+- 训练产物尚未完成时，后端和前端联调经常被“缺权重”阻塞。
+- 该工具可以先打通系统链路，后续再无缝替换为真实训练权重。
+
+### 你可以学到什么
+
+- 工程迭代可以分为“接口联通阶段”和“性能收敛阶段”，先联通再优化效率更高。
+- 显式区分“演示权重”和“正式权重”能降低实验误用风险。

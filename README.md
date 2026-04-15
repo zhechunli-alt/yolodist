@@ -180,6 +180,47 @@ The current environment does not have training dependencies installed. To actual
 pip install -r requirements.txt
 ```
 
+## Backend service (thread C)
+
+1. Sync latest run weights to backend standard names (optional):
+
+```bash
+python3 tools/sync_standard_weights.py
+```
+
+2. If you only need API/frontend smoke tests now, bootstrap standard names from one `.pt` (optional):
+
+```bash
+python3 tools/bootstrap_backend_weights.py --source weights/yolo11n.pt
+```
+
+3. Run backend preflight checks:
+
+```bash
+python3 tools/backend_preflight.py
+```
+
+4. Start Flask API:
+
+```bash
+python3 -m service.backend.app
+```
+
+Available endpoints:
+
+1. `GET /api/v1/health`
+2. `POST /api/v1/infer`
+3. `GET /api/v1/models`
+4. `POST /api/v1/models/switch`
+5. `GET /api/v1/stats/summary`
+
+Model registry follows standard weights names in `weights/`:
+
+1. `best_teacher.pt`
+2. `best_student_plain.pt`
+3. `best_student_ppla.pt`
+4. `best_student_distill.pt`
+
 ## Notes on feasibility
 
 - MVTec AD is not a native detection dataset. The conversion script creates bounding boxes from masks and repartitions anomaly samples for a detection workflow.

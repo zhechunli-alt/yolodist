@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>YOLODist 检测界面</title>
+    <style>
+      :root {
+        --bg: #f7fafc;
+        --card: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --primary: #0f766e;
+        --primary-2: #0ea5e9;
+        --ok: #16a34a;
+        --warn: #dc2626;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: linear-gradient(180deg, #eef9f6, #f7fafc 120px);
+        color: var(--text);
+        font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      .container {
+        max-width: 920px;
+        margin: 28px auto;
+        padding: 0 16px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px;
+      }
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+      h1 {
+        font-size: 24px;
+        margin: 0;
+      }
+      .status {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+        background: var(--warn);
+      }
+      .dot.ok { background: var(--ok); }
+      .section-title {
+        font-size: 14px;
+        color: var(--muted);
+        margin: 14px 0 8px;
+      }
+      .model-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .btn {
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--text);
+        padding: 8px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .btn.active {
+        border-color: transparent;
+        color: #fff;
+        background: linear-gradient(90deg, var(--primary), var(--primary-2));
+      }
+      .form-row {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14px;
+      }
+      .run {
+        border: 0;
+        color: #fff;
+        border-radius: 8px;
+        padding: 10px 16px;
+        min-width: 100px;
+        cursor: pointer;
+        background: linear-gradient(90deg, var(--primary), var(--primary-2));
+      }
+      pre {
+        margin: 8px 0 0;
+        background: #0b1f33;
+        color: #d9f0ff;
+        border-radius: 10px;
+        padding: 12px;
+        min-height: 220px;
+        font-size: 12px;
+        overflow: auto;
+      }
+      @media (max-width: 760px) {
+        .header { flex-direction: column; align-items: flex-start; }
+        .form-row { flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <div class="header">
+          <h1>工业缺陷检测</h1>
+          <div class="status">
+            <span id="healthDot" class="dot"></span>
+            <span id="healthText">连接中...</span>
+            <span> | 当前模型: <strong id="currentModel">-</strong></span>
+          </div>
+        </div>
+
+        <div class="section-title">模型切换</div>
+        <div id="modelButtons" class="model-buttons"></div>
+
+        <div class="section-title">开始检测</div>
+        <div class="form-row">
+          <input id="imagePath" placeholder="输入图片路径，如 /Users/.../bus.jpg" />
+          <input id="confVal" placeholder="置信度阈值（可选），如 0.25" />
+          <button class="run" onclick="runInfer()">检测</button>
+        </div>
+
+        <div class="section-title">检测结果</div>
+        <pre id="resultOut">{ "message": "等待检测..." }</pre>
+      </div>
+    </div>
+
+    <script>
+      let currentModel = null;
+
+      function show(obj) {
+        document.getElementById("resultOut").textContent = JSON.stringify(obj, null, 2);
+      }
+
+      async function api(url, options = {}) {
+        const res = await fetch(url, options);
+        let data = {};
+        try { data = await res.json(); } catch {}
+        return { ok: res.ok, status: res.status, data };
+      }
+
+      function refreshHealthBadge(ok) {
+        const dot = document.getElementById("healthDot");
+        const text = document.getElementById("healthText");
+        dot.className = ok ? "dot ok" : "dot";
+        text.textContent = ok ? "服务正常" : "服务异常";
+      }
+
+      async function loadHealth() {
+        const resp = await api("/api/v1/health");
+        refreshHealthBadge(resp.ok && resp.data.status === "ok");
+        currentModel = resp.data.current_model || currentModel;
+        document.getElementById("currentModel").textContent = currentModel || "未选择";
+      }
+
+      function renderModelButtons(models) {
+        const box = document.getElementById("modelButtons");
+        box.innerHTML = "";
+        models.forEach((m) => {
+          const b = document.createElement("button");
+          b.className = "btn" + (m.name === currentModel ? " active" : "");
+          b.textContent = m.available ? m.name : m.name + " (缺失)";
+          b.disabled = !m.available;
+          b.onclick = () => switchModel(m.name);
+          box.appendChild(b);
+        });
+      }
+
+      async function loadModels() {
+        const resp = await api("/api/v1/models");
+        if (!resp.ok || !resp.data.models) {
+          show(resp);
+          return;
+        }
+        currentModel = resp.data.current_model || currentModel;
+        document.getElementById("currentModel").textContent = currentModel || "未选择";
+        renderModelButtons(resp.data.models);
+      }
+
+      async function switchModel(modelName) {
+        const resp = await api("/api/v1/models/switch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model_name: modelName }),
+        });
+        show(resp.data);
+        if (resp.ok) {
+          currentModel = resp.data.current_model;
+          document.getElementById("currentModel").textContent = currentModel;
+          await loadModels();
+        }
+      }
+
+      async function runInfer() {
+        const imagePath = document.getElementById("imagePath").value.trim();
+        const confRaw = document.getElementById("confVal").value.trim();
+        if (!imagePath) {
+          show({ error: "请先输入 image_path" });
+          return;
+        }
+        const payload = { image_path: imagePath };
+        if (confRaw) payload.conf = Number(confRaw);
+
+        const resp = await api("/api/v1/infer", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        show(resp.data);
+        await loadHealth();
+      }
+
+      window.addEventListener("DOMContentLoaded", async () => {
+        document.getElementById("imagePath").value = "/Users/lizhechun/Desktop/yolodist/bus.jpg";
+        await loadHealth();
+        await loadModels();
+      });
+    </script>
+  </body>
+</html>
+
