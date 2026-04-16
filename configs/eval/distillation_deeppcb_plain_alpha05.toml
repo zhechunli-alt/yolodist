@@ -1,0 +1,10 @@
+[eval]
+model = "runs/deeppcb_distill_alpha05/distill_plain_alpha05/weights/best.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+split = "test"
+project = "runs/deeppcb_distill_alpha05"
+name = "distill_plain_alpha05_eval"
+imgsz = 640
+batch = 16
+device = "0"
+

@@ -1,0 +1,13 @@
+[train]
+model = "runs/dspcbsd_plus_baseline/baseline_plain/weights/last.pt"
+data = "datasets/processed/dspcbsd_plus_detection/data.yaml"
+project = "runs/dspcbsd_plus_baseline"
+name = "baseline_plain"
+epochs = 100
+imgsz = 640
+batch = 16
+device = "0"
+workers = 4
+seed = 42
+exist_ok = true
+resume = true

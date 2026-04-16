@@ -634,3 +634,32 @@
 
 - 工程迭代可以分为“接口联通阶段”和“性能收敛阶段”，先联通再优化效率更高。
 - 显式区分“演示权重”和“正式权重”能降低实验误用风险。
+
+## 2026-04-16 第二十一步：第二轮蒸馏策略落地并补全自动收尾
+
+### 做了什么
+
+- 在现有蒸馏代码中新增第二轮蒸馏策略：
+  - `Localization-aware KD`
+  - `Foreground-weighted Feature KD`
+- 为 `DeepPCB / PKU-Market-PCB / DsPCBSD+` 新增 `plain_locfg` 与 `epfa_locfg` 的 train/eval 配置。
+- 已完成并记录以下正式 `test` 结果：
+  - `DeepPCB distill_plain_locfg`
+  - `DeepPCB distill_epfa_locfg`
+  - `PKU-Market-PCB distill_plain_locfg`
+  - `PKU-Market-PCB distill_epfa_locfg`
+- 发现 `DsPCBSD+` 的 teacher 权重文件损坏后，已从 baseline 最优权重重新复制修复。
+- 新增自动收尾脚本：
+  - [watch_remaining_pcb_completion.sh](/root/workspace/yolodist/tools/watch_remaining_pcb_completion.sh)
+  - 用于在 `DsPCBSD+ locfg` 两组训练结束后自动完成 `test` 评估和总表刷新。
+
+### 为什么要这么做
+
+- 第一轮蒸馏在 `DeepPCB` 上与普通 student 几乎无差异，说明单纯 `response MSE + merge_teacher` 不足以把检测任务中的定位知识传递给学生。
+- 第二轮策略重点把蒸馏信号放在前景区域和框定位上，更贴近 PCB 小缺陷检测的任务特点。
+- 自动收尾脚本用于避免深夜训练结束后无人值守、评估和汇总停在半路的问题。
+
+### 你可以学到什么
+
+- 当蒸馏效果“看起来没坏但也没提升”时，往往不是多跑几轮就能解决，而是蒸馏目标本身需要升级。
+- 实验越长、分支越多，训练和评估解耦后再加 watcher 收尾，会比单纯串行脚本更稳。

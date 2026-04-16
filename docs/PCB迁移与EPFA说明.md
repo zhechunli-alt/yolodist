@@ -61,6 +61,54 @@
 - 对 shape 一致的特征做 MSE
 - 默认关闭，避免在第一轮 PCB 实验里引入额外不稳定因素
 
+## 第二轮蒸馏策略
+
+由于第一轮 `response MSE + merge_teacher` 在 `DeepPCB` 上未能拉开与普通 student 的差距，第二轮蒸馏改为更贴近目标检测本身的组合策略：`Localization-aware + Foreground-weighted Feature KD`。
+
+### 1. Localization-aware KD
+
+- 不再把整个检测头输出当作一个整体做 MSE
+- 将检测头输出拆分为：
+  - 边框回归分布
+  - 分类响应
+- 对边框回归部分使用 DFL 风格的分布蒸馏
+- 对分类部分使用 sigmoid 后的响应蒸馏
+
+这样做的原因是：
+
+- 检测任务里最难蒸馏的往往不是“有没有目标”，而是“框得准不准”
+- 第一轮蒸馏没有显式强调定位知识，容易退化成对整体输出的弱约束
+
+### 2. Foreground-weighted Feature KD
+
+- 对 `P3 / P4 / P5` 的 teacher / student 特征继续做蒸馏
+- 但不再做全图平均
+- 改为使用 GT box 生成前景 mask
+- 在前景区域内更强地对齐 teacher / student 特征
+- 背景区域仅保留较低权重
+
+这样做的原因是：
+
+- PCB 缺陷目标通常小、稀疏
+- 全图 feature KD 很容易被大面积背景稀释
+- 前景加权更符合工业缺陷检测的实际需求
+
+### 3. 当前配置
+
+- `kd_strategy = "loc_fg_distill"`
+- `distill_alpha = 0.4`
+- `loc_kd_alpha = 1.0`
+- `cls_kd_alpha = 0.25`
+- `feature_kd_alpha = 0.10`
+- `bg_weight = 0.05`
+- `mask_expand_ratio = 0.10`
+
+### 4. 预期目标
+
+- 先验证第二轮蒸馏是否能在 `DeepPCB` 上真实超过对应 student
+- 若有效，再看能否在 `PKU-Market-PCB` 与 `DsPCBSD+` 上复现
+- 若仍不明显，则论文主结论继续以 `EPFA` 为核心，蒸馏作为探索性工作
+
 ## 实验设置
 
 - Baseline：`student_plain`

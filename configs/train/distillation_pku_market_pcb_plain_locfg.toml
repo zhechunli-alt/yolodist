@@ -1,0 +1,32 @@
+[distill]
+teacher_weights = "weights/teacher_pku_market_pcb.pt"
+student_model = "configs/models/yolo11_student_plain.yaml"
+student_pretrained = "weights/yolo11n.pt"
+prepared_data = "datasets/processed/pku_market_pcb_detection/data.yaml"
+pseudo_dataset_dir = "datasets/processed/pku_market_pcb_detection_distill_plain_locfg"
+teacher_conf = 0.25
+label_strategy = "merge_teacher"
+teacher_iou_threshold = 0.5
+teacher_max_det = 100
+distill_temperature = 4.0
+distill_alpha = 0.4
+kd_strategy = "loc_fg_distill"
+cls_kd_alpha = 0.25
+loc_kd_alpha = 1.0
+bg_weight = 0.05
+mask_expand_ratio = 0.10
+enable_kd_loss = true
+enable_feature_kd_loss = true
+feature_kd_alpha = 0.10
+feature_kd_layers = [15, 18, 21]
+teacher_feature_kd_layers = [15, 18, 21]
+project = "runs/pku_market_pcb_distill_locfg"
+name = "distill_plain_locfg"
+epochs = 100
+imgsz = 640
+batch = 16
+device = "0"
+workers = 4
+seed = 42
+exist_ok = true
+

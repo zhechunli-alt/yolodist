@@ -51,7 +51,7 @@ def generate_pcb_tables(runs_root: Path, output_dir: Path) -> None:
     ablation_rows: list[dict[str, object]] = []
     for metrics_path in sorted(runs_root.glob("**/metrics_summary.json")):
         run_dir = metrics_path.parent
-        manifest_path = run_dir / "run_manifest.json"
+        manifest_path = resolve_manifest_path(run_dir)
         if not manifest_path.exists():
             continue
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -80,6 +80,23 @@ def generate_pcb_tables(runs_root: Path, output_dir: Path) -> None:
 
     write_csv(output_dir / "pcb_main_results.csv", main_rows)
     write_csv(output_dir / "pcb_ablation.csv", ablation_rows or main_rows)
+
+
+def resolve_manifest_path(run_dir: Path) -> Path:
+    direct = run_dir / "run_manifest.json"
+    if direct.exists():
+        return direct
+
+    name = run_dir.name
+    suffixes = ("_eval2", "_eval")
+    for suffix in suffixes:
+        if name.endswith(suffix):
+            train_dir = run_dir.with_name(name[: -len(suffix)])
+            candidate = train_dir / "run_manifest.json"
+            if candidate.exists():
+                return candidate
+
+    return direct
 
 
 def infer_dataset_name(data_path: str) -> str:

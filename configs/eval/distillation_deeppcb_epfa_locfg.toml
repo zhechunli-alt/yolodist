@@ -1,0 +1,10 @@
+[eval]
+model = "runs/deeppcb_distill_epfa_locfg/distill_epfa_locfg/weights/best.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+split = "test"
+project = "runs/deeppcb_distill_epfa_locfg"
+name = "distill_epfa_locfg_eval"
+imgsz = 640
+batch = 16
+device = "0"
+

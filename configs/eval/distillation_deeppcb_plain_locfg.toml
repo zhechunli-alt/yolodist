@@ -1,0 +1,10 @@
+[eval]
+model = "runs/deeppcb_distill_locfg/distill_plain_locfg/weights/best.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+split = "test"
+project = "runs/deeppcb_distill_locfg"
+name = "distill_plain_locfg_eval"
+imgsz = 640
+batch = 16
+device = "0"
+

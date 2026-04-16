@@ -76,10 +76,15 @@ def run_distillation(config_path: Path) -> None:
             teacher_weights=teacher_weights,
             alpha=alpha,
             temperature=temperature,
+            kd_strategy=str(config.get("kd_strategy", "response_mse")),
             enable_feature_kd_loss=enable_feature_kd_loss,
             feature_kd_alpha=feature_kd_alpha,
             feature_kd_layers=list(config.get("feature_kd_layers", [15, 18, 21])),
             teacher_feature_kd_layers=list(config.get("teacher_feature_kd_layers", config.get("feature_kd_layers", [15, 18, 21]))),
+            cls_kd_alpha=float(config.get("cls_kd_alpha", 0.25)),
+            loc_kd_alpha=float(config.get("loc_kd_alpha", 1.0)),
+            bg_weight=float(config.get("bg_weight", 0.05)),
+            mask_expand_ratio=float(config.get("mask_expand_ratio", 0.0)),
         )
     train_kwargs = {
         "data": str(pseudo_dataset_dir / "data.yaml"),
@@ -279,10 +284,15 @@ def attach_response_kd_loss(
     teacher_weights: Path,
     alpha: float,
     temperature: float,
+    kd_strategy: str = "response_mse",
     enable_feature_kd_loss: bool = False,
     feature_kd_alpha: float = 0.0,
     feature_kd_layers: list[int] | None = None,
     teacher_feature_kd_layers: list[int] | None = None,
+    cls_kd_alpha: float = 0.25,
+    loc_kd_alpha: float = 1.0,
+    bg_weight: float = 0.05,
+    mask_expand_ratio: float = 0.0,
 ) -> None:
     """Attach response-level KD loss into student model.loss.
 
@@ -326,17 +336,44 @@ def attach_response_kd_loss(
             temperature=temperature,
             state=state,
             mse_fn=F.mse_loss,
+            batch=batch,
+            kd_strategy=kd_strategy,
+            cls_kd_alpha=cls_kd_alpha,
+            loc_kd_alpha=loc_kd_alpha,
+            bg_weight=bg_weight,
+            mask_expand_ratio=mask_expand_ratio,
         )
         total = (1.0 - alpha) * det_loss + alpha * kd_loss
         if enable_feature_kd_loss and feature_kd_alpha > 0.0:
-            total = total + feature_kd_alpha * feature_kd_loss(feature_state, mse_fn=F.mse_loss, device=batch["img"].device)
+            total = total + feature_kd_alpha * feature_kd_loss(
+                feature_state,
+                mse_fn=F.mse_loss,
+                device=batch["img"].device,
+                batch=batch,
+                bg_weight=bg_weight,
+                mask_expand_ratio=mask_expand_ratio,
+            )
         return total, det_items
 
     student_model.loss = kd_wrapped_loss
 
 
-def response_kd_loss(student_preds, teacher_model, images, temperature: float, state: dict[str, Any], mse_fn) -> "torch.Tensor":
+def response_kd_loss(
+    student_preds,
+    teacher_model,
+    images,
+    temperature: float,
+    state: dict[str, Any],
+    mse_fn,
+    batch: dict[str, Any] | None = None,
+    kd_strategy: str = "response_mse",
+    cls_kd_alpha: float = 0.25,
+    loc_kd_alpha: float = 1.0,
+    bg_weight: float = 0.05,
+    mask_expand_ratio: float = 0.0,
+) -> "torch.Tensor":
     import torch
+    import torch.nn.functional as F
 
     image_device = images.device
     if state.get("teacher_device") != image_device:
@@ -350,6 +387,46 @@ def response_kd_loss(student_preds, teacher_model, images, temperature: float, s
     teacher_tensors = extract_pred_tensors(teacher_preds)
     if not student_tensors or not teacher_tensors:
         return torch.zeros((), device=image_device)
+
+    if kd_strategy == "loc_fg_distill":
+        detect_module = getattr(teacher_model, "model", [teacher_model])[-1]
+        reg_max = int(getattr(detect_module, "reg_max", 16))
+        nc = int(getattr(detect_module, "nc", 1))
+        reg_channels = reg_max * 4
+        kd = torch.zeros((), device=image_device)
+        pair_count = 0
+        for s, t in zip(student_tensors, teacher_tensors, strict=False):
+            if s.shape != t.shape:
+                continue
+            if s.shape[1] < reg_channels + nc:
+                continue
+            height, width = int(s.shape[2]), int(s.shape[3])
+            fg_mask = build_fg_mask(
+                batch=batch,
+                batch_size=int(s.shape[0]),
+                height=height,
+                width=width,
+                device=image_device,
+                expand_ratio=mask_expand_ratio,
+            )
+            cls_mask = mask_with_background_weight(fg_mask, bg_weight=bg_weight)
+            s_box = s[:, :reg_channels].reshape(s.shape[0], 4, reg_max, height, width)
+            t_box = t[:, :reg_channels].reshape(t.shape[0], 4, reg_max, height, width)
+            s_box_log = F.log_softmax(s_box / temperature, dim=2)
+            t_box_prob = F.softmax(t_box / temperature, dim=2)
+            loc_map = F.kl_div(s_box_log, t_box_prob, reduction="none").sum(dim=2).mean(dim=1, keepdim=True)
+            loc_loss = weighted_spatial_mean(loc_map * (temperature**2), fg_mask, bg_weight=0.0)
+
+            s_cls = torch.sigmoid(s[:, reg_channels : reg_channels + nc] / temperature)
+            t_cls = torch.sigmoid(t[:, reg_channels : reg_channels + nc] / temperature)
+            cls_map = (s_cls - t_cls).pow(2).mean(dim=1, keepdim=True)
+            cls_loss = weighted_spatial_mean(cls_map * (temperature**2), cls_mask, bg_weight=0.0)
+
+            kd = kd + (loc_kd_alpha * loc_loss) + (cls_kd_alpha * cls_loss)
+            pair_count += 1
+        if pair_count == 0:
+            return torch.zeros((), device=image_device)
+        return kd / float(pair_count)
 
     kd = torch.zeros((), device=image_device)
     pair_count = 0
@@ -402,7 +479,14 @@ def build_feature_kd_state(student_model, teacher_model, student_layers: list[in
     return state
 
 
-def feature_kd_loss(feature_state: dict[str, Any], mse_fn, device) -> "torch.Tensor":
+def feature_kd_loss(
+    feature_state: dict[str, Any],
+    mse_fn,
+    device,
+    batch: dict[str, Any] | None = None,
+    bg_weight: float = 0.05,
+    mask_expand_ratio: float = 0.0,
+) -> "torch.Tensor":
     import torch
 
     student_layers = feature_state.get("student_layers", [])
@@ -421,8 +505,78 @@ def feature_kd_loss(feature_state: dict[str, Any], mse_fn, device) -> "torch.Ten
             continue
         if student_feat.shape != teacher_feat.shape:
             continue
-        total = total + mse_fn(student_feat, teacher_feat.detach())
+        fg_mask = build_fg_mask(
+            batch=batch,
+            batch_size=int(student_feat.shape[0]),
+            height=int(student_feat.shape[2]),
+            width=int(student_feat.shape[3]),
+            device=device,
+            expand_ratio=mask_expand_ratio,
+        )
+        diff_map = (student_feat - teacher_feat.detach()).pow(2).mean(dim=1, keepdim=True)
+        total = total + weighted_spatial_mean(diff_map, fg_mask, bg_weight=bg_weight)
         pair_count += 1
     if pair_count == 0:
         return torch.zeros((), device=device)
     return total / float(pair_count)
+
+
+def build_fg_mask(
+    batch: dict[str, Any] | None,
+    batch_size: int,
+    height: int,
+    width: int,
+    device,
+    expand_ratio: float = 0.0,
+):
+    import torch
+
+    mask = torch.zeros((batch_size, 1, height, width), device=device)
+    if not batch:
+        return mask
+    bboxes = batch.get("bboxes")
+    batch_idx = batch.get("batch_idx")
+    if bboxes is None or batch_idx is None:
+        return mask
+    if not hasattr(bboxes, "shape") or bboxes.numel() == 0:
+        return mask
+
+    batch_idx = batch_idx.view(-1).to(device=device, dtype=torch.long)
+    bboxes = bboxes.to(device=device, dtype=torch.float32)
+    normalized = float(bboxes.max()) <= 1.5
+    for idx, box in zip(batch_idx.tolist(), bboxes, strict=False):
+        if idx < 0 or idx >= batch_size:
+            continue
+        if normalized:
+            x, y, w, h = box.tolist()
+            w *= 1.0 + expand_ratio
+            h *= 1.0 + expand_ratio
+            x1 = max(0, int((x - w / 2.0) * width))
+            y1 = max(0, int((y - h / 2.0) * height))
+            x2 = min(width, int((x + w / 2.0) * width + 0.9999))
+            y2 = min(height, int((y + h / 2.0) * height + 0.9999))
+        else:
+            x1, y1, x2, y2 = box.tolist()
+            x1 = max(0, int(x1))
+            y1 = max(0, int(y1))
+            x2 = min(width, int(x2 + 0.9999))
+            y2 = min(height, int(y2 + 0.9999))
+        if x2 <= x1 or y2 <= y1:
+            continue
+        mask[idx, 0, y1:y2, x1:x2] = 1.0
+    return mask
+
+
+def mask_with_background_weight(mask, bg_weight: float):
+    return mask + (1.0 - mask) * max(bg_weight, 0.0)
+
+
+def weighted_spatial_mean(loss_map, mask, bg_weight: float = 0.0):
+    import torch
+
+    weighted_mask = mask_with_background_weight(mask, bg_weight=bg_weight)
+    weighted_loss = loss_map * weighted_mask
+    denom = weighted_mask.sum()
+    if float(denom) <= 0.0:
+        return torch.zeros((), device=loss_map.device)
+    return weighted_loss.sum() / denom

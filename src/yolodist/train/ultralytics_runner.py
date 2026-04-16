@@ -57,6 +57,8 @@ def run_train(config_path: Path) -> None:
         train_kwargs["lr0"] = float(config["lr0"])
     if "momentum" in config:
         train_kwargs["momentum"] = float(config["momentum"])
+    if "resume" in config:
+        train_kwargs["resume"] = bool(config["resume"])
     model.train(
         **train_kwargs
     )
