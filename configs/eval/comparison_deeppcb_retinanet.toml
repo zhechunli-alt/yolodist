@@ -1,0 +1,12 @@
+[comparison]
+framework = "torchvision"
+model = "runs/deeppcb_compare/retinanet_r50_fpn/weights/best.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+split = "test"
+project = "runs/deeppcb_compare"
+name = "retinanet_r50_fpn_eval2"
+imgsz = 640
+batch = 16
+device = "cuda"
+workers = 4
+seed = 42

@@ -180,6 +180,16 @@ The current environment does not have training dependencies installed. To actual
 pip install -r requirements.txt
 ```
 
+If you continue the local YOLOX comparison pipeline, prefer:
+
+```bash
+PIP_NO_BUILD_ISOLATION=1 pip install -e external/YOLOX
+```
+
+Detailed restart and environment notes are recorded in:
+
+- [docs/服务器恢复与环境说明.md](/root/workspace/yolodist/docs/服务器恢复与环境说明.md)
+
 ## Backend service (thread C)
 
 1. Sync latest run weights to backend standard names (optional):

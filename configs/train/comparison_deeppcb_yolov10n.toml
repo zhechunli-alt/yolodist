@@ -1,0 +1,13 @@
+[comparison]
+framework = "ultralytics"
+model = "yolov10n.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+project = "runs/deeppcb_compare"
+name = "yolov10n"
+epochs = 100
+imgsz = 640
+batch = 16
+device = "0"
+workers = 4
+seed = 42
+exist_ok = true

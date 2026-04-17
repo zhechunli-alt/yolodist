@@ -490,6 +490,33 @@ PYTHONPATH=src python experiments/distillation/train.py --config configs/train/d
   - `plain_locfg` 相比 `student_plain` 提升明显，`mAP50-95 +0.1465`
   - `epfa_locfg` 相比 `student_epfa` 也有小幅提升，`Recall +0.0410`, `mAP50 +0.0305`
 
+### 2026-04-16 DsPCBSD+ 公平性修正重跑
+
+- 状态：`已启动`
+- 触发原因：
+  - 之前的 `DsPCBSD+ locfg` 蒸馏实验使用的 teacher 来自 baseline 中途阶段，不适合作为论文里的严格主表结论
+  - 为消除这一问题，已将 `baseline_plain` 从 `epoch 26` 续跑至 `epoch 100`
+  - 后续蒸馏统一改为：
+    - 完整 `teacher`
+    - `100 epoch`
+    - 与对应 student 尽量一致的训练条件
+- `baseline_plain(test)` 已补齐：
+  - `precision = 0.8128`
+  - `recall = 0.8033`
+  - `mAP50 = 0.8500`
+  - `mAP50-95 = 0.5133`
+- 新配置：
+  - [configs/train/distillation_dspcbsd_plus_plain_locfg_fair100.toml](/root/workspace/yolodist/configs/train/distillation_dspcbsd_plus_plain_locfg_fair100.toml)
+  - [configs/train/distillation_dspcbsd_plus_epfa_locfg_fair100.toml](/root/workspace/yolodist/configs/train/distillation_dspcbsd_plus_epfa_locfg_fair100.toml)
+  - [configs/eval/distillation_dspcbsd_plus_plain_locfg_fair100.toml](/root/workspace/yolodist/configs/eval/distillation_dspcbsd_plus_plain_locfg_fair100.toml)
+  - [configs/eval/distillation_dspcbsd_plus_epfa_locfg_fair100.toml](/root/workspace/yolodist/configs/eval/distillation_dspcbsd_plus_epfa_locfg_fair100.toml)
+- 新脚本：
+  - [tools/run_dspcbsd_fair100_distill.sh](/root/workspace/yolodist/tools/run_dspcbsd_fair100_distill.sh)
+- 当前执行顺序：
+  1. `distill_plain_locfg_fair100`
+  2. `distill_epfa_locfg_fair100`
+  3. 自动刷新 `runs/paper_tables/`
+
 ## 六、后续实验就绪状态
 
 ### DeepPCB student_plain
@@ -515,6 +542,211 @@ PYTHONPATH=src python experiments/distillation/train.py --config configs/train/d
    - `runs/paper_tables/pcb_ablation.csv`
 2. 统一比对第二轮蒸馏与普通 student 的跨数据集趋势
 3. 若仅 `DsPCBSD+` 上蒸馏有效，论文中将蒸馏表述为“对复杂多类 PCB 数据更有效”
+
+## 七、DeepPCB 外部模型对比
+
+### 2026-04-17 DeepPCB comparison 主线启动
+
+- 状态：`已启动`
+- 对比目标：
+  - 与 `student_epfa` 做同数据集、同输入尺寸、同 epoch 的外部模型对比
+- 当前纳入队列的模型：
+  - `YOLOv8n`
+  - `YOLOv10n`
+  - `SSDLite320-MobileNetV3-Large`
+  - `RetinaNet-R50-FPN`
+  - `FCOS-R50-FPN`
+  - `YOLOX-Nano`
+- 统一设置：
+  - 数据集：`DeepPCB`
+  - 输入尺寸：`640`
+  - 训练轮数：`100`
+  - `batch = 16`
+  - `seed = 42`
+- 主要新增文件：
+  - [src/yolodist/compare/runner.py](/root/workspace/yolodist/src/yolodist/compare/runner.py)
+  - [src/yolodist/data/yolo_detection_dataset.py](/root/workspace/yolodist/src/yolodist/data/yolo_detection_dataset.py)
+  - [experiments/comparison/train.py](/root/workspace/yolodist/experiments/comparison/train.py)
+  - [experiments/comparison/evaluate.py](/root/workspace/yolodist/experiments/comparison/evaluate.py)
+  - [tools/watch_deeppcb_comparison_queue.sh](/root/workspace/yolodist/tools/watch_deeppcb_comparison_queue.sh)
+  - [tools/run_deeppcb_yolox_nano.sh](/root/workspace/yolodist/tools/run_deeppcb_yolox_nano.sh)
+  - [tools/prepare_deeppcb_coco.py](/root/workspace/yolodist/tools/prepare_deeppcb_coco.py)
+  - [tools/run_deeppcb_comparison_remaining.sh](/root/workspace/yolodist/tools/run_deeppcb_comparison_remaining.sh)
+
+### 2026-04-17 DeepPCB YOLOv8n
+
+- 状态：`已完成训练 / 已完成正式 test 评估`
+- 配置：
+  - [configs/train/comparison_deeppcb_yolov8n.toml](/root/workspace/yolodist/configs/train/comparison_deeppcb_yolov8n.toml)
+  - [configs/eval/comparison_deeppcb_yolov8n.toml](/root/workspace/yolodist/configs/eval/comparison_deeppcb_yolov8n.toml)
+- 训练目录：`runs/deeppcb_compare/yolov8n/`
+- test 评估目录：`runs/deeppcb_compare/yolov8n_eval22/`
+- 当前训练末尾验证（epoch 100）：
+  - `precision = 0.9840`
+  - `recall = 0.9771`
+  - `mAP50 = 0.9897`
+  - `mAP50-95 = 0.7553`
+- 当前判断：
+  - `YOLOv8n` 在 `DeepPCB` 上训练正常，且验证集表现强
+- test 指标：
+  - `precision = 0.9560`
+  - `recall = 0.9267`
+  - `mAP50 = 0.9688`
+  - `mAP50-95 = 0.7519`
+- 与 `student_epfa(test)` 对比：
+  - `mAP50 +0.0069`
+  - `mAP50-95 +0.0841`
+  - `Recall +0.0133`
+- 当前判断：
+  - `YOLOv8n` 在 `DeepPCB` 上已形成正式 test 对照结果
+  - 这组结果强于当前 `student_epfa(test)`，后续外部对比模型需要继续统一口径后再整体比较
+  - Ultralytics 因目录名冲突，实际将 test 评估结果写入了 `yolov8n_eval22/`，后续队列脚本已改为按前缀识别，避免再次卡住
+
+### 2026-04-17 DeepPCB comparison 执行方式修正
+
+- 状态：`已切换为顺序脚本执行`
+- 修正原因：
+  - 旧 watcher 在 `eval2 / eval22` 目录名冲突情况下容易停在中间阶段
+  - 为确保剩余实验连续跑完，改为一条显式顺序脚本，按固定顺序依次执行
+- 新顺序：
+  1. `YOLOv10n test`
+  2. `SSDLite320-MobileNetV3-Large train/eval`
+  3. `RetinaNet-R50-FPN train/eval`
+  4. `FCOS-R50-FPN train/eval`
+  5. `YOLOX-Nano pipeline`
+- 新脚本：
+  - [tools/run_deeppcb_comparison_remaining.sh](/root/workspace/yolodist/tools/run_deeppcb_comparison_remaining.sh)
+
+### 2026-04-17 DeepPCB YOLOv10n
+
+- 状态：`已完成训练 / 已完成正式 test 评估`
+- 配置：
+  - [configs/train/comparison_deeppcb_yolov10n.toml](/root/workspace/yolodist/configs/train/comparison_deeppcb_yolov10n.toml)
+  - [configs/eval/comparison_deeppcb_yolov10n.toml](/root/workspace/yolodist/configs/eval/comparison_deeppcb_yolov10n.toml)
+- 训练目录：`runs/deeppcb_compare/yolov10n/`
+- test 评估目录：`runs/deeppcb_compare/yolov10n_eval22/`
+- 当前训练末尾验证（epoch 100）：
+  - `precision = 0.9576`
+  - `recall = 0.9672`
+  - `mAP50 = 0.9886`
+  - `mAP50-95 = 0.7722`
+- test 指标：
+  - `precision = 0.9351`
+  - `recall = 0.9314`
+  - `mAP50 = 0.9667`
+  - `mAP50-95 = 0.7490`
+- 与 `student_epfa(test)` 对比：
+  - `mAP50 +0.0048`
+  - `mAP50-95 +0.0812`
+  - `Recall +0.0180`
+- 当前判断：
+  - `YOLOv10n` 在 `DeepPCB` 上也强于当前 `student_epfa(test)`
+  - 该组已形成第二条正式外部对照线
+  - 旧顺序脚本停在 `YOLOv10n eval` 之后，但评估结果实际已落盘；后续从 `SSDLite` 继续顺序执行即可
+
+### 2026-04-17 DeepPCB comparison 续跑
+
+- 状态：`进行中`
+- 当前剩余模型：
+  - `SSDLite320-MobileNetV3-Large`
+  - `RetinaNet-R50-FPN`
+  - `FCOS-R50-FPN`
+  - `YOLOX-Nano`
+- 续跑策略：
+  - 重新执行 [tools/run_deeppcb_comparison_remaining.sh](/root/workspace/yolodist/tools/run_deeppcb_comparison_remaining.sh)
+  - 依靠已有结果目录自动跳过 `YOLOv10n test`
+  - 从 `SSDLite train/eval` 开始顺序往后推进
+
+### 2026-04-17 DeepPCB SSDLite320-MobileNetV3-Large
+
+- 状态：`已完成训练 / 已完成正式 test 评估`
+- 配置：
+  - [configs/train/comparison_deeppcb_ssdlite320.toml](/root/workspace/yolodist/configs/train/comparison_deeppcb_ssdlite320.toml)
+  - [configs/eval/comparison_deeppcb_ssdlite320.toml](/root/workspace/yolodist/configs/eval/comparison_deeppcb_ssdlite320.toml)
+- 训练目录：`runs/deeppcb_compare/ssdlite320_mobilenet_v3_large/`
+- test 评估目录：`runs/deeppcb_compare/ssdlite320_mobilenet_v3_large_eval2/`
+- 训练过程观察：
+  - 训练推进到 `epoch 100`
+  - 自动队列首次停在该组，主要原因是首次运行时需要下载 `mobilenet_v3_large` 预训练权重
+  - 重新触发后训练与评估均已完成
+- test 指标：
+  - `recall = 0.2671`
+  - `mAP50 = 0.1709`
+  - `mAP50-95 = 0.0461`
+- 与 `student_epfa(test)` 对比：
+  - `Recall -0.6463`
+  - `mAP50 -0.7910`
+  - `mAP50-95 -0.6217`
+- 当前判断：
+  - `SSDLite320-MobileNetV3-Large` 在 `DeepPCB` 上明显弱于当前 `student_epfa`
+  - 该组可作为轻量非 YOLO 对照中的弱基线
+
+### 2026-04-17 DeepPCB RetinaNet-R50-FPN
+
+- 状态：`已完成训练 / 已完成正式 test 评估`
+- 配置：
+  - [configs/train/comparison_deeppcb_retinanet.toml](/root/workspace/yolodist/configs/train/comparison_deeppcb_retinanet.toml)
+  - [configs/eval/comparison_deeppcb_retinanet.toml](/root/workspace/yolodist/configs/eval/comparison_deeppcb_retinanet.toml)
+- 训练目录：`runs/deeppcb_compare/retinanet_r50_fpn/`
+- test 评估目录：`runs/deeppcb_compare/retinanet_r50_fpn_eval2/`
+- 训练过程观察：
+  - 首次恢复时需要下载 `resnet50` 预训练权重
+  - 训练推进到 `epoch 100`
+  - `best.pt / last.pt` 均已生成
+- test 指标：
+  - `recall = 0.8038`
+  - `mAP50 = 0.9676`
+  - `mAP50-95 = 0.7522`
+- 与 `student_epfa(test)` 对比：
+  - `Recall -0.1096`
+  - `mAP50 +0.0057`
+  - `mAP50-95 +0.0844`
+- 当前判断：
+  - `RetinaNet-R50-FPN` 在 `DeepPCB` 上形成了第三条正式外部对照线
+  - 精度指标强于当前 `student_epfa`，但推理更重
+
+### 2026-04-17 DeepPCB FCOS-R50-FPN
+
+- 状态：`已完成训练 / 已完成正式 test 评估`
+- 配置：
+  - [configs/train/comparison_deeppcb_fcos.toml](/root/workspace/yolodist/configs/train/comparison_deeppcb_fcos.toml)
+  - [configs/eval/comparison_deeppcb_fcos.toml](/root/workspace/yolodist/configs/eval/comparison_deeppcb_fcos.toml)
+- 训练目录：`runs/deeppcb_compare/fcos_r50_fpn/`
+- test 评估目录：`runs/deeppcb_compare/fcos_r50_fpn_eval2/`
+- 训练过程观察：
+  - 依赖 `resnet50` 预训练权重，已通过提前下载解决等待问题
+  - 训练推进到 `epoch 100`
+  - `best.pt / last.pt` 均已生成
+- test 指标：
+  - `recall = 0.8101`
+  - `mAP50 = 0.9445`
+  - `mAP50-95 = 0.7430`
+- 与 `student_epfa(test)` 对比：
+  - `Recall -0.1033`
+  - `mAP50 -0.0174`
+  - `mAP50-95 +0.0752`
+- 当前判断：
+  - `FCOS-R50-FPN` 的 `mAP50-95` 高于当前 `student_epfa`
+  - 但 `Recall` 和 `mAP50` 低于当前 `student_epfa`
+  - 该组可作为 anchor-free 非 YOLO 对照
+
+### 2026-04-17 DeepPCB YOLOX-Nano
+
+- 状态：`未完成 / 已停止`
+- 配置：
+  - [configs/models/yolox_deeppcb_nano.py](/root/workspace/yolodist/configs/models/yolox_deeppcb_nano.py)
+  - [configs/train/comparison_deeppcb_yolox_nano.toml](/root/workspace/yolodist/configs/train/comparison_deeppcb_yolox_nano.toml)
+  - [configs/eval/comparison_deeppcb_yolox_nano.toml](/root/workspace/yolodist/configs/eval/comparison_deeppcb_yolox_nano.toml)
+- 日志：
+  - `runs/overnight_logs/deeppcb_yolox_nano_20260417T145643Z.log`
+- 当前观察：
+  - `DeepPCB COCO` 转换已完成
+  - 管线停在 `pip install -e external/YOLOX`
+  - 原因是 `pip` 的 build isolation 环境内无法导入 `torch`
+- 错误结论：
+  - 该次运行未进入 `YOLOX train.py`
+  - 当前仓库已把安装方式修正为 `PIP_NO_BUILD_ISOLATION=1 pip install -e external/YOLOX`
+  - 下次恢复时可以基于修正后的脚本直接重试
 
 ### 2026-04-15 PKU-Market-PCB baseline_plain
 

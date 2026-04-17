@@ -1,0 +1,12 @@
+[comparison]
+framework = "ultralytics"
+model = "runs/deeppcb_compare/yolov10n/weights/best.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+split = "test"
+project = "runs/deeppcb_compare"
+name = "yolov10n_eval2"
+imgsz = 640
+batch = 16
+device = "0"
+workers = 4
+seed = 42

@@ -663,3 +663,42 @@
 
 - 当蒸馏效果“看起来没坏但也没提升”时，往往不是多跑几轮就能解决，而是蒸馏目标本身需要升级。
 - 实验越长、分支越多，训练和评估解耦后再加 watcher 收尾，会比单纯串行脚本更稳。
+
+## 2026-04-17 第二十二步：补齐 DeepPCB 外部模型对比并整理服务器恢复环境
+
+### 做了什么
+
+- 为 `DeepPCB` 新增统一的外部模型对比训练/评估入口：
+  - `YOLOv8n`
+  - `YOLOv10n`
+  - `SSDLite320-MobileNetV3-Large`
+  - `RetinaNet-R50-FPN`
+  - `FCOS-R50-FPN`
+  - `YOLOX-Nano`
+- 已完成并落盘的正式 `test` 结果：
+  - `YOLOv8n`
+  - `YOLOv10n`
+  - `SSDLite320-MobileNetV3-Large`
+  - `RetinaNet-R50-FPN`
+  - `FCOS-R50-FPN`
+- `YOLOX-Nano` 已完成 `DeepPCB -> COCO` 转换与脚本接入，但首次运行停在 editable 安装阶段。
+- 修正了 `tools/run_deeppcb_yolox_nano.sh` 的安装方式：
+  - 由 `pip install -e external/YOLOX`
+  - 改为 `PIP_NO_BUILD_ISOLATION=1 pip install -e external/YOLOX`
+- 完善 `requirements.txt`，补齐对比实验和 `YOLOX` 依赖。
+- 新增服务器恢复说明文档，记录：
+  - 虚拟环境激活方式
+  - 数据集与结果目录
+  - 外部对比当前完成状态
+  - 下次重启后的恢复命令与尾日志命令
+
+### 为什么要这么做
+
+- 当前论文已经不只是 `PCB` 主线内部对比，还需要补外部方法对照，才能说明 `student_epfa` 的位置和价值。
+- 服务器准备关闭时，最容易丢的是“环境怎么恢复”“跑到哪一步了”“哪些日志该看”，单靠聊天记录不稳。
+- `YOLOX` 的问题并不是方法本身不可跑，而是安装过程踩了 Python 打包隔离环境的坑，需要在仓库里留下可重复的修正。
+
+### 你可以学到什么
+
+- 长周期实验项目里，文档不是附属物，而是下一次恢复生产力的关键资产。
+- 当第三方仓库接入失败时，优先把失败点、修正方案、恢复命令一并固化，能显著减少下一次的启动成本。

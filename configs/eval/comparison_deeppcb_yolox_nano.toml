@@ -1,0 +1,14 @@
+[comparison]
+framework = "yolox"
+exp_file = "configs/models/yolox_deeppcb_nano.py"
+model = "runs/deeppcb_compare_yolox/yolox_deeppcb_nano/best_ckpt.pth"
+data = "datasets/processed/deeppcb_coco"
+split = "test"
+project = "runs/deeppcb_compare_yolox"
+name = "yolox_nano_eval2"
+imgsz = 640
+batch = 16
+device = "0"
+workers = 4
+seed = 42
+exist_ok = true
