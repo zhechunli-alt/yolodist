@@ -702,3 +702,36 @@
 
 - 长周期实验项目里，文档不是附属物，而是下一次恢复生产力的关键资产。
 - 当第三方仓库接入失败时，优先把失败点、修正方案、恢复命令一并固化，能显著减少下一次的启动成本。
+
+## 2026-04-20 主线恢复
+
+- 修正 `DeepPCB distill_epfa` 伪标签数据链路，避免回落到原始数据缓存。
+- 将 `PKU-Market-PCB` 与 `DsPCBSD+` 的 `distill_epfa` 统一到公平条件：
+  - `epochs = 100`
+  - `distill_alpha = 0.5`
+  - `enable_feature_kd_loss = true`
+  - `feature_kd_alpha = 0.1`
+- 新增自动主线脚本 [tools/run_dataset_mainline.sh](/root/workspace/yolodist/tools/run_dataset_mainline.sh)。
+- 当前正在并行推进：
+  - `DsPCBSD+ baseline`
+  - `PKU student_plain`
+
+- 新增过夜总控脚本 [tools/run_pcb_overnight_mainlines.sh](/root/workspace/yolodist/tools/run_pcb_overnight_mainlines.sh)：
+  - 每 60 秒巡检一次
+  - 若某条主线未完成且当前没有相关训练/评估进程，则自动拉起
+  - 当前覆盖：
+    - `PKU-Market-PCB`
+    - `DsPCBSD+`
+
+## 2026-04-21 过夜脚本与蒸馏链路复检
+
+- 检查并确认 `src/yolodist/distill/pseudo_label.py` 已具备以下保护：
+  - 伪数据集图片/标签复制到独立目录，不再走 symlink
+  - `data.yaml` 的 `path` 指向独立伪数据目录
+  - 自动清理 `labels/*.cache`
+  - 训练前输出 `pseudo_label_stats.json`
+  - 训练前执行 `pseudo_dataset_integrity.json` 校验，若路径/缓存/symlink 异常会直接失败
+- 修复过夜主线脚本的“完成判断”：
+  - 由固定 `*_eval/metrics_summary.json`
+  - 改为通配支持 `*_eval*/metrics_summary.json`
+  - 避免 Ultralytics 生成 `eval-2`、`eval2` 时被误判为未完成，从而重复评估或重复调度

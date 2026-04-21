@@ -827,3 +827,75 @@ PYTHONPATH=src python experiments/baseline/train.py --config configs/train/basel
 - 记录结论：
   - `EPFA` 在 `PKU` 上同样有效
   - 尽管仍低于 baseline，但能稳定把轻量 student 拉起来
+
+## 2026-04-20 晚间恢复与并行主线推进
+
+- 修正了 `DeepPCB distill_epfa` 的公平蒸馏条件：
+  - 伪标签数据目录改为独立 `*_distill_epfa_fair`
+  - 图片改为真实复制，避免 Ultralytics 沿原始路径复用旧 `labels/train.cache`
+  - `distill_alpha` 提高到 `0.5`
+  - 打开 `feature_kd_loss`
+  - `feature_kd_alpha = 0.1`
+- 修正后正式 test 结果：
+  - `distill_epfa_fair(test)`：`precision = 0.9404`
+  - `recall = 0.9179`
+  - `mAP50 = 0.9628`
+  - `mAP50-95 = 0.6865`
+- 记录结论：
+  - 修正后 `distill_epfa` 不再与旧 `student_epfa` 完全重合
+  - 当前仍未超过 `student_epfa(test)`，但蒸馏链路已经真正生效
+
+- 新增 `PKU-Market-PCB` 与 `DsPCBSD+` 自动主线脚本：
+  - [tools/run_dataset_mainline.sh](/root/workspace/yolodist/tools/run_dataset_mainline.sh)
+- 统一主线顺序：
+  - `baseline -> eval -> teacher复制 -> student_plain -> student_epfa -> distill_epfa -> summarize`
+- 当前运行状态：
+  - `PKU baseline` 已完成 100 epoch，后半程已自动接到 `student_plain`
+  - `DsPCBSD+ baseline` 已启动并进入训练
+- 公平性说明：
+  - `PKU` 与 `DsPCBSD+` 的 `distill_epfa` 也已同步切换到 `fair` 条件
+  - `epochs = 100`
+  - `distill_alpha = 0.5`
+  - `feature_kd_loss = true`
+  - `feature_kd_alpha = 0.1`
+
+- 新增过夜自动调度：
+  - [tools/run_pcb_overnight_mainlines.sh](/root/workspace/yolodist/tools/run_pcb_overnight_mainlines.sh)
+  - 作用：
+    - 自动巡检 `PKU-Market-PCB` 与 `DsPCBSD+`
+    - 若某条主线中断或单步完成后无后继任务，会自动接上下一步
+  - 目标：
+    - 夜间持续占用 GPU
+    - 尽量减少人工守夜和手动续跑
+
+## 2026-04-21 蒸馏策略 tuned 版
+
+- 为进一步提升 `student_epfa` 的蒸馏收益，新开一条 `distill_epfa_tuned` 路线，不覆盖现有 `fair` 结果。
+- tuned 版核心参数：
+  - `kd_strategy = "loc_fg_distill"`
+  - `distill_alpha = 0.35`
+  - `distill_temperature = 3.0`
+  - `enable_feature_kd_loss = true`
+  - `feature_kd_alpha = 0.05`
+  - `cls_kd_alpha = 0.20`
+  - `loc_kd_alpha = 1.25`
+  - `bg_weight = 0.02`
+  - `mask_expand_ratio = 0.05`
+  - `teacher_conf = 0.30`
+  - `teacher_iou_threshold = 0.6`
+- 设计意图：
+  - 降低总蒸馏权重，减少 teacher 过强约束对学生主检测目标的压制
+  - 提高定位蒸馏比重，争取同时改善 `Recall` 与 `mAP50-95`
+  - 降低 feature KD 权重，减少中间特征过拟合 teacher 的风险
+  - 提高 teacher 伪标签置信阈值，减少噪声框
+- 新增配置：
+  - `configs/train/distillation_deeppcb_epfa_tuned.toml`
+  - `configs/train/distillation_pku_market_pcb_epfa_tuned.toml`
+  - `configs/train/distillation_dspcbsd_plus_epfa_tuned.toml`
+  - 对应 `configs/eval/*_tuned.toml`
+- 新增调度脚本：
+  - [tools/run_epfa_tuned_distill_all.sh](/root/workspace/yolodist/tools/run_epfa_tuned_distill_all.sh)
+  - [tools/run_epfa_tuned_remaining.sh](/root/workspace/yolodist/tools/run_epfa_tuned_remaining.sh)
+- 当前状态：
+  - `DeepPCB distill_epfa_tuned` 已启动
+  - `PKU` 与 `DsPCBSD+` 将在 `DeepPCB` tuned 训练结束后自动接续

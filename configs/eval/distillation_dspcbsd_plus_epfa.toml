@@ -1,9 +1,9 @@
 [eval]
-model = "runs/dspcbsd_plus_distill_epfa/distill_epfa/weights/best.pt"
+model = "runs/dspcbsd_plus_distill_epfa/distill_epfa_fair/weights/best.pt"
 data = "datasets/processed/dspcbsd_plus_detection/data.yaml"
 split = "test"
 project = "runs/dspcbsd_plus_distill_epfa"
-name = "distill_epfa_eval"
+name = "distill_epfa_fair_eval"
 imgsz = 640
 batch = 16
 device = "0"

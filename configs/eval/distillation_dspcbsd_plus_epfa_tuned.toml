@@ -1,0 +1,9 @@
+[eval]
+model = "runs/dspcbsd_plus_distill_epfa_tuned/distill_epfa_tuned/weights/best.pt"
+data = "datasets/processed/dspcbsd_plus_detection/data.yaml"
+split = "test"
+project = "runs/dspcbsd_plus_distill_epfa_tuned"
+name = "distill_epfa_tuned_eval"
+imgsz = 640
+batch = 16
+device = "0"

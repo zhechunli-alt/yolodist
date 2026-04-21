@@ -1,0 +1,9 @@
+[eval]
+model = "runs/deeppcb_distill_epfa_tuned/distill_epfa_tuned/weights/best.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+split = "test"
+project = "runs/deeppcb_distill_epfa_tuned"
+name = "distill_epfa_tuned_eval"
+imgsz = 640
+batch = 16
+device = "0"

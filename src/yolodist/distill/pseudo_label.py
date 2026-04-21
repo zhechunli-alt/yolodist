@@ -5,6 +5,8 @@ import json
 import shutil
 from typing import Any
 
+import yaml
+
 from yolodist.config import load_toml
 from yolodist.models.registry import initialize_custom_model_context, register_ultralytics_modules
 from yolodist.paths import ROOT
@@ -50,10 +52,12 @@ def run_distillation(config_path: Path) -> None:
             "config_path": str(config_path),
             "distill": config,
             "kd_active": enable_kd_loss and alpha > 0.0,
-            "kd_type": "response_mse",
+            "kd_type": str(config.get("kd_strategy", "response_mse")),
+            "pseudo_dataset_dir": str(pseudo_dataset_dir),
         },
     )
     build_pseudo_dataset(prepared_data, pseudo_dataset_dir)
+    validate_pseudo_dataset_layout(prepared_data, pseudo_dataset_dir)
     stats = pseudo_label_train_split(
         teacher_weights=teacher_weights,
         pseudo_dataset_dir=pseudo_dataset_dir,
@@ -63,10 +67,23 @@ def run_distillation(config_path: Path) -> None:
         iou_thresh=float(config.get("teacher_iou_threshold", 0.5)),
         max_det=int(config.get("teacher_max_det", 300)),
     )
+    clear_label_caches(pseudo_dataset_dir)
     (run_dir / "pseudo_label_stats.json").write_text(
         json.dumps(stats, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
+    validate_pseudo_label_effect(
+        original_yaml=prepared_data,
+        pseudo_dataset_dir=pseudo_dataset_dir,
+        stats=stats,
+    )
+    integrity = validate_pseudo_dataset(prepared_data, pseudo_dataset_dir, stats)
+    (run_dir / "pseudo_dataset_integrity.json").write_text(
+        json.dumps(integrity, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    if not integrity["ok"]:
+        raise RuntimeError(f"Pseudo dataset integrity check failed: {integrity}")
 
     student = YOLO(str(student_model))
     initialize_custom_model_context(student.model)
@@ -124,18 +141,127 @@ def build_pseudo_dataset(original_yaml: Path, pseudo_dataset_dir: Path) -> None:
         src_label_dir = original_dataset_dir / "labels" / split
         dst_image_dir = pseudo_dataset_dir / "images" / split
         dst_label_dir = pseudo_dataset_dir / "labels" / split
-        link_or_copy_tree(src_image_dir, dst_image_dir)
+        shutil.copytree(src_image_dir, dst_image_dir)
         shutil.copytree(src_label_dir, dst_label_dir)
+    clear_label_caches(pseudo_dataset_dir)
 
-    shutil.copy2(original_yaml, pseudo_dataset_dir / "data.yaml")
+    dataset_yaml = yaml.safe_load(original_yaml.read_text(encoding="utf-8"))
+    dataset_yaml["path"] = str(pseudo_dataset_dir.resolve())
+    (pseudo_dataset_dir / "data.yaml").write_text(
+        yaml.safe_dump(dataset_yaml, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
 
 
-def link_or_copy_tree(src: Path, dst: Path) -> None:
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        dst.symlink_to(src.resolve(), target_is_directory=True)
-    except OSError:
-        shutil.copytree(src, dst)
+def validate_pseudo_dataset_layout(original_yaml: Path, pseudo_dataset_dir: Path) -> None:
+    original_dataset_dir = original_yaml.parent.resolve()
+    pseudo_dataset_dir = pseudo_dataset_dir.resolve()
+    if pseudo_dataset_dir == original_dataset_dir:
+        raise RuntimeError("Pseudo dataset directory must differ from original dataset directory.")
+
+    pseudo_yaml = pseudo_dataset_dir / "data.yaml"
+    dataset_yaml = yaml.safe_load(pseudo_yaml.read_text(encoding="utf-8"))
+    yaml_path = Path(str(dataset_yaml.get("path", ""))).resolve()
+    if yaml_path != pseudo_dataset_dir:
+        raise RuntimeError(
+            f"Pseudo data.yaml path mismatch: expected {pseudo_dataset_dir}, got {yaml_path}"
+        )
+
+    for split in ("train", "val", "test"):
+        src_image_dir = original_dataset_dir / "images" / split
+        dst_image_dir = pseudo_dataset_dir / "images" / split
+        src_label_dir = original_dataset_dir / "labels" / split
+        dst_label_dir = pseudo_dataset_dir / "labels" / split
+
+        if not dst_image_dir.exists() or not dst_label_dir.exists():
+            raise RuntimeError(f"Pseudo dataset missing split directories for {split}")
+        if dst_image_dir.is_symlink():
+            raise RuntimeError(f"Pseudo image dir for {split} must be copied, not symlinked")
+
+        src_images = sorted(p.name for p in src_image_dir.iterdir() if p.is_file())
+        dst_images = sorted(p.name for p in dst_image_dir.iterdir() if p.is_file())
+        src_labels = sorted(p.name for p in src_label_dir.iterdir() if p.is_file())
+        dst_labels = sorted(p.name for p in dst_label_dir.iterdir() if p.is_file())
+        if src_images != dst_images:
+            raise RuntimeError(f"Pseudo image file list mismatch for split {split}")
+        if src_labels != dst_labels:
+            raise RuntimeError(f"Pseudo label file list mismatch for split {split}")
+
+        sample_images = dst_images[:5]
+        for image_name in sample_images:
+            sample_path = dst_image_dir / image_name
+            if sample_path.is_symlink():
+                raise RuntimeError(f"Pseudo image file {sample_path} must be copied, not symlinked")
+
+
+def validate_pseudo_label_effect(original_yaml: Path, pseudo_dataset_dir: Path, stats: dict[str, int]) -> None:
+    if stats["total_images"] <= 0:
+        raise RuntimeError("Pseudo labeling found zero training images.")
+
+    if stats["images_with_teacher_labels"] <= 0:
+        raise RuntimeError("Teacher produced zero pseudo-labeled images; distillation setup is likely ineffective.")
+
+    if stats["teacher_boxes_added"] <= 0:
+        raise RuntimeError("Teacher added zero boxes; pseudo labels did not change the training labels.")
+
+    original_train_dir = original_yaml.parent / "labels" / "train"
+    pseudo_train_dir = pseudo_dataset_dir / "labels" / "train"
+    changed_files = 0
+    for pseudo_label_path in sorted(pseudo_train_dir.glob("*.txt")):
+        original_label_path = original_train_dir / pseudo_label_path.name
+        original_text = original_label_path.read_text(encoding="utf-8") if original_label_path.exists() else ""
+        pseudo_text = pseudo_label_path.read_text(encoding="utf-8")
+        if original_text != pseudo_text:
+            changed_files += 1
+    if changed_files <= 0:
+        raise RuntimeError("Pseudo label files are identical to the original labels; distillation would collapse to standard training.")
+
+
+def clear_label_caches(pseudo_dataset_dir: Path) -> None:
+    for cache_path in (pseudo_dataset_dir / "labels").rglob("*.cache"):
+        cache_path.unlink(missing_ok=True)
+
+
+def validate_pseudo_dataset(
+    original_yaml: Path,
+    pseudo_dataset_dir: Path,
+    stats: dict[str, int],
+) -> dict[str, Any]:
+    dataset_yaml = yaml.safe_load((pseudo_dataset_dir / "data.yaml").read_text(encoding="utf-8"))
+    expected_path = str(pseudo_dataset_dir.resolve())
+    yaml_path = str(dataset_yaml.get("path", ""))
+    image_train_dir = pseudo_dataset_dir / "images" / "train"
+    label_train_dir = pseudo_dataset_dir / "labels" / "train"
+    sample_image = next((p for p in sorted(image_train_dir.iterdir()) if p.is_file()), None)
+    sample_label = next((p for p in sorted(label_train_dir.iterdir()) if p.is_file() and p.suffix == ".txt"), None)
+    cache_files = sorted(str(p.relative_to(pseudo_dataset_dir)) for p in (pseudo_dataset_dir / "labels").rglob("*.cache"))
+    teacher_box_ratio = 0.0
+    if stats.get("total_images", 0) > 0:
+        teacher_box_ratio = float(stats.get("teacher_boxes_added", 0)) / float(stats["total_images"])
+    integrity = {
+        "ok": True,
+        "original_yaml": str(original_yaml),
+        "pseudo_dataset_dir": str(pseudo_dataset_dir),
+        "yaml_path": yaml_path,
+        "expected_yaml_path": expected_path,
+        "yaml_path_matches": yaml_path == expected_path,
+        "train_image_dir_exists": image_train_dir.exists(),
+        "train_label_dir_exists": label_train_dir.exists(),
+        "sample_image_is_symlink": sample_image.is_symlink() if sample_image else None,
+        "sample_label_is_symlink": sample_label.is_symlink() if sample_label else None,
+        "remaining_cache_files": cache_files,
+        "teacher_boxes_added": int(stats.get("teacher_boxes_added", 0)),
+        "teacher_box_ratio": teacher_box_ratio,
+    }
+    integrity["ok"] = bool(
+        integrity["yaml_path_matches"]
+        and integrity["train_image_dir_exists"]
+        and integrity["train_label_dir_exists"]
+        and integrity["sample_image_is_symlink"] is False
+        and integrity["sample_label_is_symlink"] is False
+        and not integrity["remaining_cache_files"]
+    )
+    return integrity
 
 
 def pseudo_label_train_split(
