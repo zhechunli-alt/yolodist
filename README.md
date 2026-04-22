@@ -198,6 +198,13 @@ Detailed restart and environment notes are recorded in:
 python3 tools/sync_standard_weights.py
 ```
 
+If weights are stored outside the repo, try auto-discovery and copy:
+
+```bash
+python3 tools/find_and_link_weights.py --dry-run
+python3 tools/find_and_link_weights.py
+```
+
 2. If you only need API/frontend smoke tests now, bootstrap standard names from one `.pt` (optional):
 
 ```bash
@@ -216,13 +223,24 @@ python3 tools/backend_preflight.py
 python3 -m service.backend.app
 ```
 
+Optional host/port override:
+
+```bash
+BACKEND_HOST=127.0.0.1 BACKEND_PORT=18080 python3 -m service.backend.app
+```
+
 Available endpoints:
 
 1. `GET /api/v1/health`
 2. `POST /api/v1/infer`
-3. `GET /api/v1/models`
-4. `POST /api/v1/models/switch`
-5. `GET /api/v1/stats/summary`
+3. `POST /api/v1/infer/upload` (multipart file upload)
+4. `POST /api/v1/infer/compare` (multi-model compare on one uploaded image)
+5. `GET /api/v1/models`
+6. `POST /api/v1/models/switch`
+7. `POST /api/v1/records/save`
+8. `GET /api/v1/records/list`
+9. `GET /api/v1/report/export?record_uuid=...`
+10. `GET /api/v1/stats/summary`
 
 Model registry follows standard weights names in `weights/`:
 
@@ -230,6 +248,8 @@ Model registry follows standard weights names in `weights/`:
 2. `best_student_plain.pt`
 3. `best_student_ppla.pt`
 4. `best_student_distill.pt`
+
+It also auto-discovers any extra `weights/*.pt` and exposes them as switchable model aliases.
 
 ## Notes on feasibility
 

@@ -51,6 +51,7 @@ class InferEngine:
             )
 
         model = self._load_model(target_model, model_path)
+        class_names = getattr(model, "names", {}) or {}
 
         start = time.perf_counter()
         results = model.predict(source=image.as_posix(), conf=conf, verbose=False)
@@ -70,7 +71,14 @@ class InferEngine:
             cls_val = int(box.cls[0].item())
             conf_val = float(box.conf[0].item())
             xyxy = [round(float(v), 2) for v in box.xyxy[0].tolist()]
-            detections.append({"cls": cls_val, "conf": round(conf_val, 4), "xyxy": xyxy})
+            detections.append(
+                {
+                    "cls": cls_val,
+                    "class_name": str(class_names.get(cls_val, cls_val)),
+                    "conf": round(conf_val, 4),
+                    "xyxy": xyxy,
+                }
+            )
 
         h, w = result.orig_shape
         return {

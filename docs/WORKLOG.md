@@ -635,6 +635,68 @@
 - 工程迭代可以分为“接口联通阶段”和“性能收敛阶段”，先联通再优化效率更高。
 - 显式区分“演示权重”和“正式权重”能降低实验误用风险。
 
+## 2026-04-20 第二十一步：前后端联调能力升级（上传推理 + 动态模型发现 + 简洁检测台）
+
+### 做了什么
+
+- 后端新增上传推理接口：
+  - [service/backend/app.py](/Users/lizhechun/Desktop/yolodist/service/backend/app.py)
+  - `POST /api/v1/infer/upload`，支持 `multipart/form-data` 图片上传后直接推理。
+- 后端模型注册增强：
+  - [service/backend/model_registry.py](/Users/lizhechun/Desktop/yolodist/service/backend/model_registry.py)
+  - 保留标准权重别名，同时自动发现 `weights/*.pt` 作为可切换模型。
+- 推理返回增强：
+  - [service/backend/infer.py](/Users/lizhechun/Desktop/yolodist/service/backend/infer.py)
+  - `detections` 里新增 `class_name` 字段。
+- 前端界面重构为单页检测台：
+  - [service/backend/templates/index.html](/Users/lizhechun/Desktop/yolodist/service/backend/templates/index.html)
+  - 支持模型按钮切换、上传检测（推荐）、路径检测（兜底）、图片预览、摘要与结果列表。
+- 文档更新：
+  - [README.md](/Users/lizhechun/Desktop/yolodist/README.md)
+  - 增加上传接口说明与 `BACKEND_HOST/BACKEND_PORT` 启动方式。
+
+### 为什么要这么做
+
+- 你现在进入“模型已产出 -> 系统联调”阶段，手填本地路径在浏览器端体验差且不稳定。
+- 上传推理能让前端和后端形成真正可演示闭环，便于论文答辩现场演示。
+- 动态模型发现可兼容你已有权重命名，不需要每次手动改名才能切换。
+
+### 你可以学到什么
+
+- “可演示”系统的关键是最短操作链路：选模型 -> 选图 -> 出结果。
+- 后端兼容标准契约的同时增加动态能力，可以降低研发过程中的命名耦合和维护成本。
+
+## 2026-04-20 第二十二步：按论文式系统界面逻辑重构前后端（加载-检测-评估-诊断）
+
+### 做了什么
+
+- 前端界面重构为论文式主界面逻辑：
+  - [service/backend/templates/index.html](/Users/lizhechun/Desktop/yolodist/service/backend/templates/index.html)
+  - 包含：左侧图像加载列表、右上样本信息、中部 Tab（缺陷检测/多模型对比/统计评估）、右下医师诊断与记录导出。
+- 后端新增系统化业务接口：
+  - [service/backend/app.py](/Users/lizhechun/Desktop/yolodist/service/backend/app.py)
+  - 新增：
+    1. `POST /api/v1/infer/compare`
+    2. `POST /api/v1/records/save`
+    3. `GET /api/v1/records/list`
+    4. `GET /api/v1/report/export`
+- SQLite 新增业务表：
+  - `inspection_records`
+  - `detection_items`
+  - `review_notes`
+- 文档同步：
+  - [README.md](/Users/lizhechun/Desktop/yolodist/README.md) 增补新接口清单。
+
+### 为什么要这么做
+
+- 你提出参考论文“系统实现界面介绍”，核心是“模块化主界面 + 明确业务流程”，而不是单一推理面板。
+- 这次重构让项目从“模型测试页”升级为“可记录、可追溯、可导出”的质检系统原型。
+
+### 你可以学到什么
+
+- 算法系统的工程落地要把“推理结果”变成“业务记录”，才能真正支持论文中的软件实现描述。
+- 通过统一数据流（加载 -> 检测 -> 诊断 -> 导出）可以显著减少演示与答辩时的操作复杂度。
+
 ## 2026-04-16 第二十一步：第二轮蒸馏策略落地并补全自动收尾
 
 ### 做了什么

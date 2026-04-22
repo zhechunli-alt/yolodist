@@ -19,13 +19,24 @@ class ModelRegistry:
 
     def __init__(self, weights_dir: Path | None = None) -> None:
         self.weights_dir = weights_dir or WEIGHTS_DIR
-        self._model_paths: Dict[str, Path] = {
+        self._standard_model_paths: Dict[str, Path] = {
             "teacher": self.weights_dir / "best_teacher.pt",
             "student_plain": self.weights_dir / "best_student_plain.pt",
             "student_ppla": self.weights_dir / "best_student_ppla.pt",
             "student_distill": self.weights_dir / "best_student_distill.pt",
         }
+        self._model_paths: Dict[str, Path] = {}
+        self._rebuild_model_paths()
         self._current_model = self._pick_default_model()
+
+    def _rebuild_model_paths(self) -> None:
+        merged: Dict[str, Path] = dict(self._standard_model_paths)
+        if self.weights_dir.exists():
+            for path in sorted(self.weights_dir.glob("*.pt")):
+                alias = path.stem
+                if alias not in merged:
+                    merged[alias] = path
+        self._model_paths = merged
 
     def _pick_default_model(self) -> Optional[str]:
         for name, path in self._model_paths.items():
@@ -34,6 +45,7 @@ class ModelRegistry:
         return None
 
     def refresh(self) -> None:
+        self._rebuild_model_paths()
         if self._current_model and not self._model_paths[self._current_model].exists():
             self._current_model = self._pick_default_model()
         if self._current_model is None:
@@ -87,4 +99,3 @@ class ModelRegistry:
                 for spec in models
             ],
         }
-
