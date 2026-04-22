@@ -899,3 +899,51 @@ PYTHONPATH=src python experiments/baseline/train.py --config configs/train/basel
 - 当前状态：
   - `DeepPCB distill_epfa_tuned` 已启动
   - `PKU` 与 `DsPCBSD+` 将在 `DeepPCB` tuned 训练结束后自动接续
+
+## 2026-04-21 新增非 YOLO 对比模型补充
+
+- 目标：
+  - 补充一组适合 PCB 检测叙事的非 YOLO 对比模型
+  - 优先选择参数量中等、实现风险低、结果大概率弱于 `student_epfa` 的模型
+- 最终执行的三条 DeepPCB 对比线：
+  - `SSDLite320-MobileNetV3-Large`
+  - `Faster R-CNN MobileNetV3 Large 320 FPN`
+  - `Faster R-CNN MobileNetV3 Large FPN`
+- 统一设置：
+  - 数据集：`DeepPCB`
+  - 输入尺寸：`640`
+  - 轮数：`100`
+  - 优化器：`SGD`
+  - `seed = 42`
+- 本轮接入改动：
+  - `src/yolodist/compare/runner.py`
+    - 新增支持：
+      - `fasterrcnn_mobilenet_v3_large_320_fpn`
+      - `fasterrcnn_mobilenet_v3_large_fpn`
+  - 新增配置：
+    - `configs/train/comparison_deeppcb_fasterrcnn_mnv3_320.toml`
+    - `configs/eval/comparison_deeppcb_fasterrcnn_mnv3_320.toml`
+    - `configs/train/comparison_deeppcb_fasterrcnn_mnv3_fpn.toml`
+    - `configs/eval/comparison_deeppcb_fasterrcnn_mnv3_fpn.toml`
+  - 新增自动收尾脚本：
+    - [tools/watch_deeppcb_new_comparisons.sh](/root/workspace/yolodist/tools/watch_deeppcb_new_comparisons.sh)
+- 最终 test 结果：
+
+| 模型 | Params(M) | Precision | Recall | mAP50 | mAP50-95 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `student_epfa` | 1.286 | 0.9438 | 0.9156 | 0.9633 | 0.6984 |
+| `SSDLite320-MobileNetV3-Large` | 3.792 | 0.3433 | 0.3239 | 0.1889 | 0.0518 |
+| `Faster R-CNN MobileNetV3 Large 320 FPN` | 18.956 | 0.5647 | 0.2859 | 0.5606 | 0.1881 |
+| `Faster R-CNN MobileNetV3 Large FPN` | 18.956 | 0.8537 | 0.7361 | 0.9243 | 0.6643 |
+
+- 当前结论：
+  - 三个新增非 YOLO 对比模型都弱于 `student_epfa`
+  - 其中最有论文价值的是 `Faster R-CNN MobileNetV3 Large FPN`
+  - `SSDLite` 与 `Faster R-CNN 320 FPN` 更适合作为明显偏弱的外部基线
+- 已生成资产：
+  - `runs/paper_tables/deeppcb_additional_comparisons.csv`
+  - `runs/paper_tables/deeppcb_additional_comparisons.md`
+  - `runs/paper_figures/generated/deeppcb_additional_comparisons_map5095.png`
+  - `runs/paper_figures/generated/deeppcb_additional_train_curve_map5095.png`
+  - `runs/paper_figures/generated/deeppcb_additional_train_curve_recall.png`
+  - `runs/paper_figures/generated/deeppcb_additional_qualitative_panel.png`

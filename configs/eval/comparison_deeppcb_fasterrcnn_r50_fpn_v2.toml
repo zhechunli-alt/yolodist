@@ -1,0 +1,14 @@
+[comparison]
+framework = "torchvision"
+model = "runs/deeppcb_compare/fasterrcnn_r50_fpn_v2/weights/best.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+project = "runs/deeppcb_compare"
+name = "fasterrcnn_r50_fpn_v2_eval"
+model_name = "fasterrcnn_resnet50_fpn_v2"
+split = "test"
+imgsz = 640
+batch = 4
+device = "cuda"
+workers = 4
+seed = 42
+exist_ok = true

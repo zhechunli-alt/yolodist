@@ -1,0 +1,14 @@
+[comparison]
+framework = "torchvision"
+model = "runs/deeppcb_compare/fasterrcnn_mnv3_320_fpn/weights/best.pt"
+data = "datasets/processed/deeppcb_detection/data.yaml"
+project = "runs/deeppcb_compare"
+name = "fasterrcnn_mnv3_320_fpn_eval"
+model_name = "fasterrcnn_mobilenet_v3_large_320_fpn"
+split = "test"
+imgsz = 640
+batch = 8
+device = "cuda"
+workers = 4
+seed = 42
+exist_ok = true

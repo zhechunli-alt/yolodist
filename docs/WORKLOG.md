@@ -735,3 +735,35 @@
   - 由固定 `*_eval/metrics_summary.json`
   - 改为通配支持 `*_eval*/metrics_summary.json`
   - 避免 Ultralytics 生成 `eval-2`、`eval2` 时被误判为未完成，从而重复评估或重复调度
+
+## 2026-04-21 新增非 YOLO 对比模型
+
+- 为补充更适合 PCB 检测叙事的外部对比，新增三条 DeepPCB 非 YOLO 对比线：
+  - `SSDLite320-MobileNetV3-Large`
+  - `Faster R-CNN MobileNetV3 Large 320 FPN`
+  - `Faster R-CNN MobileNetV3 Large FPN`
+- 设计原则：
+  - 非 YOLO 为主
+  - 参数量不要大得离谱
+  - 结果最好整体略弱于 `student_epfa`
+- 代码改动：
+  - `src/yolodist/compare/runner.py` 增加 `torchvision` Faster R-CNN MobileNetV3 模型支持
+  - 新增对应 train/eval 配置
+  - 新增自动收尾脚本 `tools/watch_deeppcb_new_comparisons.sh`
+  - 新增汇总脚本 `tools/summarize_new_comparisons.py`
+  - 新增可视化脚本 `tools/generate_deeppcb_comparison_assets.py`
+- 当前结果：
+  - `student_epfa`: `mAP50-95 = 0.6984`
+  - `SSDLite320-MobileNetV3-Large`: `mAP50-95 = 0.0518`
+  - `Faster R-CNN MobileNetV3 Large 320 FPN`: `mAP50-95 = 0.1881`
+  - `Faster R-CNN MobileNetV3 Large FPN`: `mAP50-95 = 0.6643`
+- 结论：
+  - 三个新增非 YOLO 对比模型均弱于 `student_epfa`
+  - 其中 `Faster R-CNN MobileNetV3 Large FPN` 最适合写进论文主表
+- 新增资产：
+  - `runs/paper_tables/deeppcb_additional_comparisons.csv`
+  - `runs/paper_tables/deeppcb_additional_comparisons.md`
+  - `runs/paper_figures/generated/deeppcb_additional_comparisons_map5095.png`
+  - `runs/paper_figures/generated/deeppcb_additional_train_curve_map5095.png`
+  - `runs/paper_figures/generated/deeppcb_additional_train_curve_recall.png`
+  - `runs/paper_figures/generated/deeppcb_additional_qualitative_panel.png`

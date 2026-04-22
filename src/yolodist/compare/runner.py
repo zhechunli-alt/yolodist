@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
+from torchvision.ops import box_iou
 
 from yolodist.config import load_toml
 from yolodist.data.yolo_detection_dataset import YoloDetectionDataset, detection_collate_fn
@@ -199,12 +200,40 @@ def run_torchvision_eval(config: dict[str, object]) -> Path:
 def build_torchvision_model(model_name: str, num_classes_without_background: int):
     from torchvision.models import MobileNet_V3_Large_Weights, ResNet50_Weights
     from torchvision.models.detection import (
+        fasterrcnn_mobilenet_v3_large_320_fpn,
+        fasterrcnn_mobilenet_v3_large_fpn,
+        fasterrcnn_resnet50_fpn,
+        fasterrcnn_resnet50_fpn_v2,
         fcos_resnet50_fpn,
         retinanet_resnet50_fpn_v2,
         ssdlite320_mobilenet_v3_large,
     )
 
     num_classes = num_classes_without_background + 1
+    if model_name == "fasterrcnn_mobilenet_v3_large_320_fpn":
+        return fasterrcnn_mobilenet_v3_large_320_fpn(
+            weights=None,
+            weights_backbone=MobileNet_V3_Large_Weights.DEFAULT,
+            num_classes=num_classes,
+        )
+    if model_name == "fasterrcnn_mobilenet_v3_large_fpn":
+        return fasterrcnn_mobilenet_v3_large_fpn(
+            weights=None,
+            weights_backbone=MobileNet_V3_Large_Weights.DEFAULT,
+            num_classes=num_classes,
+        )
+    if model_name == "fasterrcnn_resnet50_fpn":
+        return fasterrcnn_resnet50_fpn(
+            weights=None,
+            weights_backbone=ResNet50_Weights.DEFAULT,
+            num_classes=num_classes,
+        )
+    if model_name == "fasterrcnn_resnet50_fpn_v2":
+        return fasterrcnn_resnet50_fpn_v2(
+            weights=None,
+            weights_backbone=ResNet50_Weights.DEFAULT,
+            num_classes=num_classes,
+        )
     if model_name == "ssdlite320_mobilenet_v3_large":
         return ssdlite320_mobilenet_v3_large(
             weights=None,
@@ -231,6 +260,9 @@ def evaluate_torchvision_model(model, loader, device: torch.device, with_speed: 
     metric = MeanAveragePrecision(box_format="xyxy")
     inference_time = 0.0
     total_images = 0
+    tp = 0
+    fp = 0
+    fn = 0
     with torch.inference_mode():
         for images, targets in loader:
             images = [image.to(device) for image in images]
@@ -254,8 +286,13 @@ def evaluate_torchvision_model(model, loader, device: torch.device, with_speed: 
                 for target in targets
             ]
             metric.update(preds, refs)
+            batch_tp, batch_fp, batch_fn = match_predictions_at_iou50(preds, refs)
+            tp += batch_tp
+            fp += batch_fp
+            fn += batch_fn
     result = metric.compute()
     summary = {
+        "metrics/precision(B)": float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0,
         "metrics/recall(B)": float(result["mar_100"].cpu()),
         "metrics/mAP50(B)": float(result["map_50"].cpu()),
         "metrics/mAP50-95(B)": float(result["map"].cpu()),
@@ -277,3 +314,49 @@ def seed_everything(seed: int) -> None:
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+
+def match_predictions_at_iou50(preds: list[dict], refs: list[dict], score_threshold: float = 0.25) -> tuple[int, int, int]:
+    total_tp = 0
+    total_fp = 0
+    total_fn = 0
+    for pred, ref in zip(preds, refs):
+        pred_boxes = pred["boxes"]
+        pred_scores = pred["scores"]
+        pred_labels = pred["labels"]
+        ref_boxes = ref["boxes"]
+        ref_labels = ref["labels"]
+
+        keep = pred_scores >= score_threshold
+        pred_boxes = pred_boxes[keep]
+        pred_scores = pred_scores[keep]
+        pred_labels = pred_labels[keep]
+
+        matched = torch.zeros(len(ref_boxes), dtype=torch.bool)
+        order = torch.argsort(pred_scores, descending=True)
+        pred_boxes = pred_boxes[order]
+        pred_labels = pred_labels[order]
+
+        image_tp = 0
+        image_fp = 0
+        for box, label in zip(pred_boxes, pred_labels):
+            same_class = (ref_labels == label) & (~matched)
+            if same_class.sum() == 0:
+                image_fp += 1
+                continue
+            candidates = ref_boxes[same_class]
+            ious = box_iou(box.unsqueeze(0), candidates).squeeze(0)
+            best_iou, best_idx = torch.max(ious, dim=0)
+            if float(best_iou) >= 0.5:
+                ref_indices = torch.nonzero(same_class, as_tuple=False).squeeze(1)
+                matched[ref_indices[int(best_idx)]] = True
+                image_tp += 1
+            else:
+                image_fp += 1
+
+        image_fn = int((~matched).sum().item())
+        total_tp += image_tp
+        total_fp += image_fp
+        total_fn += image_fn
+
+    return total_tp, total_fp, total_fn

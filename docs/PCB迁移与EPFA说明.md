@@ -194,3 +194,70 @@ baseline_plain 作为 teacher
 - `DsPCBSD+` 虽然可公开下载，但原始目录结构可能与 `DeepPCB` 不同，因此准备脚本做成了自动探测式而不是硬编码。
 - `feature KD` 只有在 teacher / student 对应层 shape 一致时才参与，否则会自动跳过，避免训练直接报错。
 - `EPFA-Lite` 依赖输入图像上下文，因此在 runner 里增加了前向 pre-hook 来传递当前 batch 图像；这部分实现尽量局部，避免破坏现有训练入口。
+
+## 最终主线结果
+
+当前最建议用于论文主表的结果如下。
+
+| 数据集 | 模型 | Params(M) | Precision | Recall | mAP50 | mAP50-95 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| DeepPCB | baseline | 2.624 | 0.9579 | 0.9402 | 0.9725 | 0.7434 |
+| DeepPCB | student_plain | 1.286 | 0.9158 | 0.8725 | 0.9310 | 0.6498 |
+| DeepPCB | student_epfa | 1.286 | 0.9438 | 0.9156 | 0.9633 | 0.6984 |
+| DeepPCB | distill_epfa_fair | 1.286 | 0.9404 | 0.9179 | 0.9628 | 0.6865 |
+| PKU-Market-PCB | baseline | 2.624 | 0.9017 | 0.8816 | 0.9114 | 0.4437 |
+| PKU-Market-PCB | student_plain | 1.286 | 0.8360 | 0.6423 | 0.7360 | 0.2998 |
+| PKU-Market-PCB | student_epfa | 1.286 | 0.8954 | 0.6594 | 0.7938 | 0.3533 |
+| PKU-Market-PCB | distill_epfa_fair | 1.286 | 0.8484 | 0.7860 | 0.8293 | 0.3798 |
+| DsPCBSD+ | baseline | 2.592 | 0.9003 | 0.8856 | 0.9349 | 0.6223 |
+| DsPCBSD+ | student_plain | 1.286 | 0.8426 | 0.8272 | 0.8857 | 0.5519 |
+| DsPCBSD+ | student_epfa | 1.286 | 0.8398 | 0.8071 | 0.8724 | 0.5343 |
+| DsPCBSD+ | distill_epfa_fair | 1.286 | 0.8187 | 0.8020 | 0.8586 | 0.5231 |
+
+## tuned 蒸馏结论
+
+为了进一步尝试同时提升 `Recall` 与 `mAP50-95`，后续又测试了 `distill_epfa_tuned`。当前最终结果是：
+
+- `DeepPCB`: `0.935 / 0.903 / 0.958 / 0.664`
+- `PKU-Market-PCB`: `0.845 / 0.751 / 0.821 / 0.365`
+- `DsPCBSD+`: `0.807 / 0.815 / 0.853 / 0.517`
+
+与 `distill_epfa_fair` 对比后可以确认：
+
+- `DeepPCB tuned` 不如 `fair`
+- `PKU tuned` 不如 `fair`
+- `DsPCBSD+ tuned` 只有 `Recall` 略高，但整体仍不如 `fair`
+
+因此 `tuned` 版本只建议作为蒸馏超参数探索结果，不建议进入论文主表。
+
+## 当前最稳妥的论文结论
+
+1. `baseline` 仍然是三套数据集上的性能上界。
+2. `EPFA-Lite` 在 `DeepPCB` 与 `PKU-Market-PCB` 上有效，能够提升轻量学生模型。
+3. `DsPCBSD+` 上当前 `EPFA-Lite` 未超过 `student_plain`，说明收益存在数据集依赖性。
+4. `distill_epfa_fair` 只在 `PKU-Market-PCB` 上相对 `student_epfa` 显示出一定增益，其余数据集未稳定优于 `student_epfa`。
+5. 论文主卖点应继续聚焦 `EPFA-Lite`，蒸馏作为补充探索而非核心贡献。
+
+## 已生成的论文图表
+
+当前已经生成并整理好的论文图表位于：
+
+- `runs/paper_figures/`
+- `runs/paper_figures/generated/`
+- `runs/paper_figures/FIGURE_GUIDE.md`
+
+优先推荐使用：
+
+1. 三个数据集的主线定性对比图
+2. 主线 mAP50-95 柱状图
+3. 主线 Recall 柱状图
+4. 参数量-精度散点图
+5. 速度-精度散点图
+6. 蒸馏策略对比图
+
+如果后续由其他人继续写论文，建议直接配合使用：
+
+- `docs/论文写作交接文档.md`
+- `runs/paper_tables/pcb_main_results.csv`
+- `runs/paper_tables/pcb_ablation.csv`
+- `runs/paper_figures/FIGURE_GUIDE.md`
