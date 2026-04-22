@@ -1,0 +1,83 @@
+{
+  "dataset": "DeepPCB-mini-demo",
+  "class_names": [
+    "open",
+    "short",
+    "mousebite",
+    "spur",
+    "spurious_copper",
+    "missing_hole"
+  ],
+  "items": [
+    {
+      "image": "00041200_test.jpg",
+      "label": "00041200_test.txt",
+      "classes": [
+        "missing_hole",
+        "mousebite",
+        "open",
+        "spur",
+        "spurious_copper"
+      ],
+      "box_count": 5
+    },
+    {
+      "image": "00041201_test.jpg",
+      "label": "00041201_test.txt",
+      "classes": [
+        "missing_hole",
+        "mousebite",
+        "open",
+        "spurious_copper"
+      ],
+      "box_count": 5
+    },
+    {
+      "image": "00041202_test.jpg",
+      "label": "00041202_test.txt",
+      "classes": [
+        "missing_hole",
+        "mousebite",
+        "open",
+        "spur"
+      ],
+      "box_count": 4
+    },
+    {
+      "image": "00041203_test.jpg",
+      "label": "00041203_test.txt",
+      "classes": [
+        "missing_hole",
+        "mousebite",
+        "open",
+        "spur",
+        "spurious_copper"
+      ],
+      "box_count": 5
+    },
+    {
+      "image": "00041204_test.jpg",
+      "label": "00041204_test.txt",
+      "classes": [
+        "missing_hole",
+        "mousebite",
+        "open",
+        "short",
+        "spur",
+        "spurious_copper"
+      ],
+      "box_count": 6
+    },
+    {
+      "image": "00041205_test.jpg",
+      "label": "00041205_test.txt",
+      "classes": [
+        "missing_hole",
+        "open",
+        "short",
+        "spur"
+      ],
+      "box_count": 5
+    }
+  ]
+}
