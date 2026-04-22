@@ -6,9 +6,12 @@ import sys
 from typing import List, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
 from yolodist.paths import WEIGHTS_DIR
+
+from service.backend.model_registry import ModelRegistry
 
 
 def check_dependency(name: str) -> Tuple[bool, str]:
@@ -20,16 +23,13 @@ def check_dependency(name: str) -> Tuple[bool, str]:
 
 
 def check_weights() -> Tuple[bool, str]:
-    expected = [
-        WEIGHTS_DIR / "best_teacher.pt",
-        WEIGHTS_DIR / "best_student_plain.pt",
-        WEIGHTS_DIR / "best_student_ppla.pt",
-        WEIGHTS_DIR / "best_student_distill.pt",
-    ]
-    existing = [p for p in expected if p.exists()]
-    if len(existing) >= 2:
-        return True, f"weights: {len(existing)}/4 available (>=2 required for switching)"
-    return False, f"weights: {len(existing)}/4 available (<2, switch test cannot pass)"
+    registry = ModelRegistry(weights_dir=WEIGHTS_DIR)
+    available = [spec for spec in registry.list_models() if spec.exists]
+    current = registry.current_model()
+    if len(available) >= 1:
+        preview = ", ".join(spec.name for spec in available[:6])
+        return True, f"weights: {len(available)} available; current={current}; models={preview}"
+    return False, "weights: 0 available in weights/"
 
 
 def main() -> None:

@@ -20,8 +20,14 @@ class ModelRegistry:
     def __init__(self, weights_dir: Path | None = None) -> None:
         self.weights_dir = weights_dir or WEIGHTS_DIR
         self._standard_model_paths: Dict[str, Path] = {
+            "student_epfa": self.weights_dir / "best_deeppcb_student_epfa.pt",
+            "baseline": self.weights_dir / "best_deeppcb_baseline.pt",
+            "student_plain": self.weights_dir / "best_deeppcb_student_plain.pt",
+            "distill_epfa": self.weights_dir / "best_deeppcb_distill_epfa.pt",
+            "teacher_deeppcb": self.weights_dir / "teacher_deeppcb.pt",
+            "teacher_pku_market_pcb": self.weights_dir / "teacher_pku_market_pcb.pt",
+            "teacher_dspcbsd_plus": self.weights_dir / "teacher_dspcbsd_plus.pt",
             "teacher": self.weights_dir / "best_teacher.pt",
-            "student_plain": self.weights_dir / "best_student_plain.pt",
             "student_ppla": self.weights_dir / "best_student_ppla.pt",
             "student_distill": self.weights_dir / "best_student_distill.pt",
         }
@@ -39,6 +45,17 @@ class ModelRegistry:
         self._model_paths = merged
 
     def _pick_default_model(self) -> Optional[str]:
+        preferred_order = [
+            "student_epfa",
+            "distill_epfa",
+            "student_plain",
+            "baseline",
+            "teacher_deeppcb",
+        ]
+        for name in preferred_order:
+            path = self._model_paths.get(name)
+            if path and path.exists():
+                return name
         for name, path in self._model_paths.items():
             if path.exists():
                 return name

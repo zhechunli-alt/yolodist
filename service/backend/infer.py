@@ -3,8 +3,11 @@ from __future__ import annotations
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import sys
+import os
 
 from .model_registry import ModelRegistry
+from src.yolodist.paths import ROOT
 
 
 class InferEngine:
@@ -18,12 +21,23 @@ class InferEngine:
         cached = self._model_cache.get(model_name)
         if cached is not None:
             return cached
+        os.environ.setdefault("YOLO_AUTOINSTALL", "False")
+        os.environ.setdefault("ULTRALYTICS_AUTOINSTALL", "False")
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        if str(ROOT / "src") not in sys.path:
+            sys.path.insert(0, str(ROOT / "src"))
+        import yolodist  # noqa: F401  # pylint: disable=import-outside-toplevel,unused-import
+        from yolodist.models.registry import (  # pylint: disable=import-outside-toplevel
+            register_ultralytics_modules,
+        )
         try:
             from ultralytics import YOLO  # pylint: disable=import-outside-toplevel
         except Exception as exc:
             raise RuntimeError(
                 "ultralytics is not installed. Run: pip install ultralytics"
             ) from exc
+        register_ultralytics_modules()
         model = YOLO(model_path.as_posix())
         self._model_cache[model_name] = model
         return model

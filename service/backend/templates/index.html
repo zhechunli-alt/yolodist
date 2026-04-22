@@ -333,33 +333,33 @@
           </section>
 
           <section class="panel">
-            <h3 class="panel-title">医师诊断模块</h3>
+            <h3 class="panel-title">人工复核模块</h3>
             <div class="row">
-              <input id="doctorName" placeholder="诊断人" />
+              <input id="doctorName" placeholder="复核人" />
               <select id="riskLevel">
-                <option value="">风险等级</option>
-                <option value="low">低风险</option>
-                <option value="medium">中风险</option>
-                <option value="high">高风险</option>
+                <option value="">缺陷等级</option>
+                <option value="low">轻微</option>
+                <option value="medium">中等</option>
+                <option value="high">严重</option>
               </select>
             </div>
             <div style="margin-top:8px;">
-              <textarea id="doctorDiagnosis" placeholder="填写人工诊断意见..."></textarea>
+              <textarea id="doctorDiagnosis" placeholder="填写人工复核意见..."></textarea>
             </div>
             <div class="row" style="margin-top:8px;">
-              <button class="btn primary" onclick="saveDiagnosisRecord()">保存诊断</button>
+              <button class="btn primary" onclick="saveDiagnosisRecord()">保存复核</button>
               <button class="btn" onclick="loadRecordList()">刷新历史</button>
             </div>
             <div style="margin-top:8px;">
               <select id="recordSelect"></select>
             </div>
             <div class="row" style="margin-top:8px;">
-              <button class="btn" onclick="exportSelectedReport()">导出报告(JSON)</button>
+              <button class="btn" onclick="exportSelectedReport()">导出质检报告(JSON)</button>
             </div>
           </section>
 
           <section class="panel footer">
-            <span class="small" id="saveStatus">尚未保存记录</span>
+          <span class="small" id="saveStatus">尚未保存复核记录</span>
             <span class="small">原始返回</span>
           </section>
 
@@ -607,12 +607,12 @@
       }
 
       async function saveSampleMetaOnly() {
-        setRaw({ info: "样本信息仅在保存诊断记录时落库。请先完成一次检测后点击“保存诊断”" });
+          setRaw({ info: "样本信息仅在保存复核记录时落库。请先完成一次检测后点击“保存复核”" });
       }
 
       async function saveDiagnosisRecord() {
         if (!state.lastResult) {
-          setRaw({ error: "请先执行检测，再保存诊断记录" });
+          setRaw({ error: "请先执行检测，再保存复核记录" });
           return;
         }
         const doctorNote = {
@@ -678,4 +678,3 @@
     </script>
   </body>
 </html>
-
