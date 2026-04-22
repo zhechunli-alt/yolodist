@@ -3,407 +3,633 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YOLODist 工业缺陷质检系统</title>
+    <title>YOLODist PCB 缺陷检测演示系统</title>
     <style>
       :root {
-        --bg: #f4faf7;
-        --card: #ffffff;
+        --bg: #edf6f1;
+        --panel: #ffffff;
         --line: #d8e4dd;
-        --text: #1f2937;
-        --muted: #6b7280;
+        --text: #162028;
+        --muted: #64748b;
         --brand: #0f766e;
-        --brand2: #0284c7;
+        --brand2: #2563eb;
+        --accent: #ecfdf5;
+        --danger: #dc2626;
         --ok: #16a34a;
-        --bad: #dc2626;
+        --shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
       }
       * { box-sizing: border-box; }
-      body {
+      html, body {
+        height: 100%;
         margin: 0;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 15% 0%, rgba(37, 99, 235, 0.16), transparent 30%),
+          radial-gradient(circle at 100% 0%, rgba(15, 118, 110, 0.18), transparent 36%),
+          var(--bg);
         color: var(--text);
         font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-        background: radial-gradient(circle at 90% 0%, #d8f0ff 0%, transparent 40%), var(--bg);
+      }
+      body {
+        display: flex;
+        justify-content: center;
       }
       .app {
-        max-width: 1260px;
-        margin: 0 auto;
-        padding: 16px;
+        width: min(1480px, 100vw);
+        height: 100vh;
+        padding: 14px;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        gap: 12px;
+      }
+      .topbar, .nav, .page {
+        background: rgba(255, 255, 255, 0.86);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(216, 228, 221, 0.9);
+        border-radius: 18px;
+        box-shadow: var(--shadow);
       }
       .topbar {
+        padding: 14px 18px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 12px;
       }
-      .topbar h1 {
+      .title-wrap h1 {
         margin: 0;
         font-size: 24px;
       }
-      .status {
+      .title-wrap p {
+        margin: 4px 0 0;
         color: var(--muted);
         font-size: 13px;
+      }
+      .status-strip {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        color: var(--muted);
+        font-size: 13px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
       }
       .dot {
         display: inline-block;
         width: 8px;
         height: 8px;
-        border-radius: 50%;
+        border-radius: 999px;
         margin-right: 6px;
-        background: var(--bad);
+        background: var(--danger);
       }
       .dot.ok { background: var(--ok); }
-
-      .layout {
-        display: grid;
-        grid-template-columns: 320px 1fr;
-        gap: 12px;
+      .nav {
+        padding: 10px;
+        display: flex;
+        gap: 10px;
       }
-      .panel {
-        background: var(--card);
+      .nav button,
+      .btn,
+      .btn-secondary,
+      .btn:disabled,
+      .btn-secondary:disabled {
         border: 1px solid var(--line);
         border-radius: 12px;
-        padding: 12px;
-      }
-      .panel-title {
-        margin: 0 0 10px;
+        padding: 10px 14px;
         font-size: 14px;
-        color: var(--muted);
       }
-      .btn {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: #fff;
-        color: var(--text);
-        padding: 8px 10px;
+      .nav button,
+      .btn,
+      .btn-secondary {
         cursor: pointer;
       }
-      .btn.primary {
-        border: 0;
-        color: #fff;
-        background: linear-gradient(90deg, var(--brand), var(--brand2));
-      }
-      .btn.active {
-        border: 0;
-        color: #fff;
-        background: linear-gradient(90deg, var(--brand), var(--brand2));
-      }
-      .btn[disabled] {
-        opacity: 0.55;
+      .btn:disabled,
+      .btn-secondary:disabled {
         cursor: not-allowed;
+        opacity: 0.55;
       }
-      .row {
-        display: flex;
-        gap: 8px;
+      .nav button,
+      .btn-secondary {
+        background: #fff;
+        color: var(--text);
+      }
+      .nav button.active,
+      .btn,
+      .tag.active {
+        border-color: transparent;
+        color: #fff;
+        background: linear-gradient(90deg, var(--brand), var(--brand2));
+      }
+      .page {
+        padding: 14px;
+        display: none;
+        overflow: hidden;
+      }
+      .page.active {
+        display: grid;
+      }
+      .grid-2 {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: 12px;
+        height: 100%;
+      }
+      .grid-3 {
+        display: grid;
+        grid-template-columns: 1.1fr 1.4fr 1fr;
+        gap: 12px;
+        height: 100%;
       }
       .col {
-        display: flex;
-        flex-direction: column;
+        display: grid;
+        gap: 12px;
+        min-height: 0;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px;
+        min-height: 0;
+        display: grid;
+        gap: 10px;
+      }
+      .panel h3 {
+        margin: 0;
+        font-size: 15px;
+      }
+      .panel-desc {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .upload-card {
+        border: 1px dashed var(--line);
+        border-radius: 14px;
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+        background: #fafdfb;
+      }
+      .upload-card strong { font-size: 14px; }
+      .hint {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .hidden-input { display: none; }
+      .file-list,
+      .records-list,
+      .raw-box,
+      .det-list,
+      .compare-grid,
+      .model-groups,
+      .model-selection {
+        min-height: 0;
+        overflow: auto;
+      }
+      .file-list,
+      .records-list,
+      .det-list {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+      }
+      .file-list li,
+      .records-list li,
+      .det-list li {
+        padding: 10px 12px;
+        border-bottom: 1px solid #edf2ef;
+        cursor: pointer;
+        font-size: 12px;
+      }
+      .file-list li:last-child,
+      .records-list li:last-child,
+      .det-list li:last-child {
+        border-bottom: 0;
+      }
+      .file-list li.active,
+      .records-list li.active {
+        background: var(--accent);
+        color: #065f46;
+        font-weight: 600;
+      }
+      .meta-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
         gap: 8px;
       }
       input, textarea, select {
         width: 100%;
         border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 9px 10px;
+        border-radius: 12px;
+        padding: 10px 12px;
         font-size: 14px;
+        background: #fff;
       }
-      textarea { min-height: 90px; resize: vertical; }
-
-      .file-list {
-        margin: 0;
-        padding: 0;
-        list-style: none;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        max-height: 260px;
-        overflow: auto;
+      textarea {
+        min-height: 110px;
+        resize: none;
       }
-      .file-list li {
-        padding: 8px 10px;
-        border-bottom: 1px solid #edf2ef;
-        font-size: 12px;
-        cursor: pointer;
-      }
-      .file-list li:last-child { border-bottom: 0; }
-      .file-list li.active {
-        background: #ecfdf5;
-        color: #065f46;
-        font-weight: 600;
-      }
-
-      .model-buttons {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .main-grid {
-        display: grid;
-        grid-template-rows: auto auto 1fr auto;
-        gap: 12px;
-      }
-      .meta-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 8px;
-      }
-      .tabs {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 10px;
-      }
-      .tab-content { display: none; }
-      .tab-content.active { display: block; }
-
       .viewer-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        gap: 12px;
+        min-height: 0;
       }
-      .viewer-box {
+      .viewer-card {
         border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 8px;
+        border-radius: 16px;
+        padding: 10px;
+        display: grid;
+        gap: 8px;
       }
-      .viewer-title {
-        margin: 0 0 8px;
-        color: var(--muted);
-        font-size: 13px;
-      }
-      .canvas-wrap {
+      .viewer-frame {
         border: 1px dashed var(--line);
-        border-radius: 8px;
-        min-height: 280px;
+        border-radius: 12px;
+        background: #fafafa;
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #fafafa;
+        min-height: 340px;
+        overflow: hidden;
       }
-      canvas, img.preview {
+      .viewer-frame canvas,
+      .viewer-frame img {
         max-width: 100%;
-        max-height: 280px;
+        max-height: 340px;
       }
-
-      .result-kv {
+      .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 8px;
+      }
+      .stat-item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px;
+        background: #fbfffd;
+      }
+      .stat-item span {
+        display: block;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .stat-item strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 18px;
+      }
+      .group-title {
+        margin: 0 0 8px;
+        color: var(--muted);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .model-groups {
+        display: grid;
+        gap: 10px;
+      }
+      .model-group,
+      .compare-block {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 10px;
+      }
+      .model-button-grid,
+      .tag-grid {
         display: flex;
         flex-wrap: wrap;
-        gap: 14px;
+        gap: 8px;
+      }
+      .tag {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 7px 10px;
+        background: #fff;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .tag small {
+        display: block;
         color: var(--muted);
+        font-size: 11px;
+      }
+      .tag.disabled {
+        cursor: not-allowed;
+        background: #f8fafc;
+        color: var(--muted);
+      }
+      .asset-list {
+        display: grid;
+        gap: 8px;
+      }
+      .asset-item {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px;
+        background: #fbfffd;
+      }
+      .asset-item strong {
+        display: block;
         font-size: 13px;
       }
-      .det-list {
-        margin: 8px 0 0;
-        padding: 0;
-        list-style: none;
-        max-height: 180px;
-        overflow: auto;
-      }
-      .det-list li {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        padding: 6px 8px;
-        margin-bottom: 6px;
+      .asset-item span {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
         font-size: 12px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .model-selection label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin-bottom: 8px;
+        font-size: 13px;
       }
       .compare-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .compare-card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 10px;
+        display: grid;
         gap: 8px;
       }
-      .compare-item {
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        padding: 8px;
-        font-size: 12px;
-      }
-      pre {
+      .compare-card h4 {
         margin: 0;
-        padding: 10px;
-        border-radius: 10px;
-        background: #0b1f33;
-        color: #d9f0ff;
-        font-size: 12px;
-        max-height: 180px;
-        overflow: auto;
+        font-size: 14px;
       }
-      .footer {
+      .raw-box {
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: #081421;
+        color: #d8edff;
+        padding: 10px;
+        font-size: 12px;
+        white-space: pre-wrap;
+      }
+      .footer-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-      }
-      .small {
-        font-size: 12px;
         color: var(--muted);
+        font-size: 12px;
       }
-      @media (max-width: 980px) {
-        .layout { grid-template-columns: 1fr; }
-        .meta-grid { grid-template-columns: 1fr; }
-        .viewer-grid, .compare-grid { grid-template-columns: 1fr; }
+      @media (max-width: 1200px) {
+        .grid-2,
+        .grid-3,
+        .viewer-grid,
+        .compare-grid,
+        .stat-grid,
+        .meta-grid {
+          grid-template-columns: 1fr;
+        }
+        html, body {
+          overflow: auto;
+        }
+        .app {
+          height: auto;
+        }
       }
     </style>
   </head>
   <body>
     <div class="app">
-      <div class="topbar">
-        <h1>工业缺陷检测与质检记录系统</h1>
-        <div class="status">
-          <span id="healthDot" class="dot"></span>
-          <span id="healthText">连接中...</span>
-          <span> | 当前模型：<strong id="currentModel">-</strong></span>
+      <header class="topbar">
+        <div class="title-wrap">
+          <h1>YOLODist PCB 缺陷检测演示系统</h1>
+          <p>默认演示模型为论文主线代表模型 Student-EPFA，支持主线模型、教师模型和经典对比模型切换。</p>
         </div>
-      </div>
+        <div class="status-strip">
+          <span><span id="healthDot" class="dot"></span><span id="healthText">连接中...</span></span>
+          <span>当前模型：<strong id="currentModel">-</strong></span>
+          <span>当前页面：<strong id="currentPageLabel">数据加载</strong></span>
+        </div>
+      </header>
 
-      <div class="layout">
-        <aside class="col">
-          <section class="panel">
-            <h3 class="panel-title">图像加载模块</h3>
-            <div class="col">
-              <input id="singleFileInput" type="file" accept="image/*" />
-              <input id="folderInput" type="file" accept="image/*" webkitdirectory multiple />
+      <nav class="nav">
+        <button id="nav-load" class="active" onclick="showPage('load')">1. 数据加载</button>
+        <button id="nav-detect" onclick="showPage('detect')">2. 单模型检测</button>
+        <button id="nav-compare" onclick="showPage('compare')">3. 多模型对比</button>
+        <button id="nav-records" onclick="showPage('records')">4. 记录导出</button>
+      </nav>
+
+      <section id="page-load" class="page active">
+        <div class="grid-2">
+          <div class="col">
+            <div class="panel">
+              <h3>图像加载模块</h3>
+              <p class="panel-desc">分别支持单张图片演示和文件夹批量浏览，两个上传模式已明确区分。</p>
+              <input id="singleFileInput" class="hidden-input" type="file" accept="image/*" />
+              <input id="folderInput" class="hidden-input" type="file" accept="image/*" webkitdirectory multiple />
+              <div class="upload-card">
+                <strong>单张图片上传</strong>
+                <div class="hint">用于单样本推理演示与论文截图。</div>
+                <button class="btn" onclick="document.getElementById('singleFileInput').click()">选择单张图片</button>
+              </div>
+              <div class="upload-card">
+                <strong>文件夹批量导入</strong>
+                <div class="hint">用于浏览整批样本并快速切换待测图片。</div>
+                <button class="btn" onclick="document.getElementById('folderInput').click()">选择图片文件夹</button>
+              </div>
               <div class="row">
-                <button class="btn" onclick="loadFolderFiles()">加载文件夹</button>
-                <button class="btn" onclick="clearFiles()">清空列表</button>
+                <button class="btn-secondary" onclick="loadFolderFiles()">载入所选文件夹</button>
+                <button class="btn-secondary" onclick="clearFiles()">清空列表</button>
               </div>
               <ul id="fileList" class="file-list"></ul>
             </div>
-          </section>
+          </div>
 
-          <section class="panel">
-            <h3 class="panel-title">模型切换</h3>
-            <div id="modelButtons" class="model-buttons"></div>
-          </section>
-        </aside>
-
-        <main class="main-grid">
-          <section class="panel">
-            <h3 class="panel-title">样本信息模块</h3>
-            <div class="meta-grid">
-              <input id="metaSampleName" placeholder="样本名称" />
-              <input id="metaBatchNo" placeholder="批次号" />
-              <input id="metaStation" placeholder="工位/产线" />
-              <input id="metaImagePath" placeholder="图片路径（自动填充）" />
-              <input id="metaImageSize" placeholder="分辨率（自动填充）" />
-              <input id="metaSource" placeholder="来源" />
-            </div>
-            <div class="row" style="margin-top:8px;">
-              <button class="btn" onclick="saveSampleMetaOnly()">保存样本信息</button>
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="tabs">
-              <button id="tabBtnDetect" class="btn active" onclick="showTab('detect')">缺陷检测</button>
-              <button id="tabBtnCompare" class="btn" onclick="showTab('compare')">多模型对比</button>
-              <button id="tabBtnStats" class="btn" onclick="showTab('stats')">统计评估</button>
-            </div>
-
-            <div id="tabDetect" class="tab-content active">
-              <div class="row" style="margin-bottom:8px;">
-                <input id="confInput" type="number" step="0.01" min="0" max="1" placeholder="置信度阈值(可选)" />
-                <button class="btn primary" onclick="runDetect()">分割/检测</button>
+          <div class="col">
+            <div class="panel">
+              <h3>样本信息模块</h3>
+              <p class="panel-desc">录入样本名称、批次、工位等基础信息，后续保存复核记录时会一起入库。</p>
+              <div class="meta-grid">
+                <input id="metaSampleName" placeholder="样本名称" />
+                <input id="metaBatchNo" placeholder="批次号" />
+                <input id="metaStation" placeholder="工位 / 产线" />
+                <input id="metaImagePath" placeholder="图片路径（自动填充）" />
+                <input id="metaImageSize" placeholder="分辨率（自动填充）" />
+                <input id="metaSource" placeholder="来源（自动填充）" />
               </div>
+              <div class="footer-row">
+                <span>当前文件：<strong id="selectedFileName">未选择</strong></span>
+                <button class="btn-secondary" onclick="saveSampleMetaOnly()">保存样本信息</button>
+              </div>
+            </div>
+
+            <div class="panel" style="grid-template-rows:auto 1fr;">
+              <h3>当前原图预览</h3>
+              <div class="viewer-frame"><img id="previewImage" alt="原图预览" /></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-detect" class="page">
+        <div class="grid-2">
+          <div class="col">
+            <div class="panel">
+              <h3>模型切换模块</h3>
+              <p class="panel-desc">已删除旧的缺失别名，仅保留统一命名后的可用模型。默认模型为 DeepPCB / Student-EPFA。</p>
+              <div id="singleModelGroups" class="model-groups"></div>
+            </div>
+            <div class="panel">
+              <h3>检测控制</h3>
+              <input id="confInput" type="number" step="0.01" min="0" max="1" placeholder="置信度阈值（默认 0.25）" />
+              <button class="btn" onclick="runDetect()">运行单模型检测</button>
+              <div class="stat-grid">
+                <div class="stat-item"><span>模型</span><strong id="statModel">-</strong></div>
+                <div class="stat-item"><span>耗时(ms)</span><strong id="statLatency">-</strong></div>
+                <div class="stat-item"><span>目标数</span><strong id="statCount">0</strong></div>
+                <div class="stat-item"><span>最高置信度</span><strong id="statMaxConf">-</strong></div>
+                <div class="stat-item"><span>平均置信度</span><strong id="statAvgConf">-</strong></div>
+              </div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="panel" style="grid-template-rows:auto 1fr auto;">
+              <h3>检测结果展示</h3>
               <div class="viewer-grid">
-                <div class="viewer-box">
-                  <p class="viewer-title">原图</p>
-                  <div class="canvas-wrap"><img id="previewImage" class="preview" alt="原图预览" /></div>
+                <div class="viewer-card">
+                  <div class="panel-desc">原图</div>
+                  <div class="viewer-frame"><img id="detectSourcePreview" alt="检测页原图" /></div>
                 </div>
-                <div class="viewer-box">
-                  <p class="viewer-title">检测结果</p>
-                  <div class="canvas-wrap"><canvas id="overlayCanvas"></canvas></div>
+                <div class="viewer-card">
+                  <div class="panel-desc">检测框叠加</div>
+                  <div class="viewer-frame"><canvas id="overlayCanvas"></canvas></div>
                 </div>
-              </div>
-            </div>
-
-            <div id="tabCompare" class="tab-content">
-              <div class="row" style="margin-bottom:8px;">
-                <button class="btn primary" onclick="runCompare()">查看全模型检测结果</button>
-              </div>
-              <div id="compareGrid" class="compare-grid"></div>
-            </div>
-
-            <div id="tabStats" class="tab-content">
-              <div class="result-kv">
-                <span>模型：<strong id="statModel">-</strong></span>
-                <span>耗时(ms)：<strong id="statLatency">-</strong></span>
-                <span>目标数：<strong id="statCount">0</strong></span>
-                <span>最高置信度：<strong id="statMaxConf">-</strong></span>
-                <span>平均置信度：<strong id="statAvgConf">-</strong></span>
               </div>
               <ul id="detList" class="det-list"></ul>
             </div>
-          </section>
+          </div>
+        </div>
+      </section>
 
-          <section class="panel">
-            <h3 class="panel-title">人工复核模块</h3>
-            <div class="row">
-              <input id="doctorName" placeholder="复核人" />
-              <select id="riskLevel">
-                <option value="">缺陷等级</option>
-                <option value="low">轻微</option>
-                <option value="medium">中等</option>
-                <option value="high">严重</option>
-              </select>
+      <section id="page-compare" class="page">
+        <div class="grid-3">
+          <div class="col">
+            <div class="panel">
+              <h3>对比模型选择</h3>
+              <p class="panel-desc">在线对比仅启用可实时推理的主线模型；经典对比模型权重会在下方单独展示，便于论文截图与说明。</p>
+              <div id="compareModelSelection" class="model-selection"></div>
+              <input id="compareConfInput" type="number" step="0.01" min="0" max="1" placeholder="对比阈值（默认 0.25）" />
+              <button class="btn" onclick="runCompare()">运行多模型对比</button>
             </div>
-            <div style="margin-top:8px;">
+            <div class="panel">
+              <h3>论文对比模型资产</h3>
+              <p class="panel-desc">这些权重已纳入项目资产，但属于非 YOLO 对比模型，当前演示页不做在线推理，避免和主线推理接口混淆。</p>
+              <div id="comparisonAssets" class="asset-list"></div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="panel" style="grid-template-rows:auto 1fr;">
+              <h3>对比结果概览</h3>
+              <div id="compareGrid" class="compare-grid"></div>
+            </div>
+          </div>
+          <div class="col">
+            <div class="panel" style="grid-template-rows:auto 1fr;">
+              <h3>原始返回 / 调试信息</h3>
+              <div id="rawOutput" class="raw-box">{ "message": "等待操作..." }</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="page-records" class="page">
+        <div class="grid-2">
+          <div class="col">
+            <div class="panel">
+              <h3>人工复核模块</h3>
+              <div class="meta-grid">
+                <input id="doctorName" placeholder="复核人" />
+                <select id="riskLevel">
+                  <option value="">缺陷等级</option>
+                  <option value="low">轻微</option>
+                  <option value="medium">中等</option>
+                  <option value="high">严重</option>
+                </select>
+              </div>
               <textarea id="doctorDiagnosis" placeholder="填写人工复核意见..."></textarea>
+              <div class="row">
+                <button class="btn" onclick="saveDiagnosisRecord()">保存复核</button>
+                <button class="btn-secondary" onclick="loadRecordList()">刷新历史</button>
+              </div>
+              <div class="footer-row">
+                <span id="saveStatus">尚未保存复核记录</span>
+                <button class="btn-secondary" onclick="exportSelectedReport()">导出质检报告(JSON)</button>
+              </div>
             </div>
-            <div class="row" style="margin-top:8px;">
-              <button class="btn primary" onclick="saveDiagnosisRecord()">保存复核</button>
-              <button class="btn" onclick="loadRecordList()">刷新历史</button>
-            </div>
-            <div style="margin-top:8px;">
+          </div>
+          <div class="col">
+            <div class="panel" style="grid-template-rows:auto 1fr;">
+              <h3>历史记录模块</h3>
               <select id="recordSelect"></select>
+              <ul id="recordsList" class="records-list"></ul>
             </div>
-            <div class="row" style="margin-top:8px;">
-              <button class="btn" onclick="exportSelectedReport()">导出质检报告(JSON)</button>
-            </div>
-          </section>
-
-          <section class="panel footer">
-          <span class="small" id="saveStatus">尚未保存复核记录</span>
-            <span class="small">原始返回</span>
-          </section>
-
-          <section class="panel">
-            <pre id="rawOutput">{ "message": "等待操作..." }</pre>
-          </section>
-        </main>
-      </div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <script>
+      const PAGE_META = {
+        load: "数据加载",
+        detect: "单模型检测",
+        compare: "多模型对比",
+        records: "记录导出",
+      };
+
       const state = {
         files: [],
         selectedFile: null,
         currentModel: null,
+        currentDisplayName: null,
         lastResult: null,
         compareResults: [],
+        modelCatalog: [],
+        modelGroups: {},
       };
 
       function setRaw(obj) {
         document.getElementById("rawOutput").textContent = JSON.stringify(obj, null, 2);
       }
+
       function setStatus(ok) {
         const dot = document.getElementById("healthDot");
         const text = document.getElementById("healthText");
         dot.className = ok ? "dot ok" : "dot";
         text.textContent = ok ? "服务正常" : "服务异常";
       }
-      function showTab(name) {
-        const pairs = [
-          ["detect", "tabBtnDetect", "tabDetect"],
-          ["compare", "tabBtnCompare", "tabCompare"],
-          ["stats", "tabBtnStats", "tabStats"],
-        ];
-        pairs.forEach(([tab, btnId, panelId]) => {
-          const active = tab === name;
-          document.getElementById(btnId).className = "btn" + (active ? " active" : "");
-          document.getElementById(panelId).className = "tab-content" + (active ? " active" : "");
+
+      function showPage(name) {
+        Object.keys(PAGE_META).forEach((key) => {
+          const active = key === name;
+          document.getElementById(`nav-${key}`).className = active ? "active" : "";
+          document.getElementById(`page-${key}`).className = active ? "page active" : "page";
         });
+        document.getElementById("currentPageLabel").textContent = PAGE_META[name];
       }
-      function confValue() {
-        const raw = document.getElementById("confInput").value.trim();
-        return raw ? Number(raw) : null;
+
+      function confValue(inputId = "confInput") {
+        const raw = document.getElementById(inputId).value.trim();
+        return raw ? Number(raw) : 0.25;
       }
+
       async function apiJson(url, options = {}) {
         const res = await fetch(url, options);
         let data = {};
@@ -411,40 +637,110 @@
         return { ok: res.ok, status: res.status, data };
       }
 
+      function modelRoleLabel(item) {
+        if (item.group === "mainline") return "主线";
+        if (item.group === "comparison") return "对比";
+        if (item.group === "teacher") return "教师";
+        return item.role || "-";
+      }
+
+      function renderSingleModelButtons(groups) {
+        const host = document.getElementById("singleModelGroups");
+        host.innerHTML = "";
+        ["mainline", "comparison", "teacher"].forEach((groupKey) => {
+          const models = (groups[groupKey] || []).filter((item) => item.runtime_supported);
+          if (!models.length) return;
+          const wrap = document.createElement("div");
+          wrap.className = "model-group";
+          const title = document.createElement("p");
+          title.className = "group-title";
+          title.textContent = groupKey === "mainline" ? "主线模型" : (groupKey === "comparison" ? "对比模型" : "教师模型");
+          const grid = document.createElement("div");
+          grid.className = "tag-grid";
+          models.forEach((item) => {
+            const button = document.createElement("button");
+            button.className = "tag" + (item.key === state.currentModel ? " active" : "");
+            button.innerHTML = `<strong>${item.display_name}</strong><small>${modelRoleLabel(item)} · ${item.dataset}</small>`;
+            button.onclick = () => switchModel(item.key);
+            grid.appendChild(button);
+          });
+          wrap.appendChild(title);
+          wrap.appendChild(grid);
+          host.appendChild(wrap);
+        });
+      }
+
+      function renderCompareModelSelection(groups) {
+        const host = document.getElementById("compareModelSelection");
+        host.innerHTML = "";
+        const assets = document.getElementById("comparisonAssets");
+        assets.innerHTML = "";
+        const defaultKeys = new Set([
+          "deeppcb_student_epfa",
+          "deeppcb_baseline",
+          "deeppcb_student_plain",
+          "deeppcb_distill_epfa",
+        ]);
+        ["mainline", "comparison"].forEach((groupKey) => {
+          const models = groups[groupKey] || [];
+          if (!models.length) return;
+          const block = document.createElement("div");
+          block.className = "compare-block";
+          const title = document.createElement("p");
+          if (groupKey === "mainline") {
+            title.className = "group-title";
+            title.textContent = "主线模型";
+            block.appendChild(title);
+          }
+          models.forEach((item) => {
+            if (item.runtime_supported) {
+              const label = document.createElement("label");
+              label.innerHTML = `
+                <input type="checkbox" value="${item.key}" ${defaultKeys.has(item.key) ? "checked" : ""} />
+                <span>${item.display_name}</span>
+              `;
+              block.appendChild(label);
+            } else {
+              const asset = document.createElement("div");
+              asset.className = "asset-item";
+              asset.innerHTML = `<strong>${item.display_name}</strong><span>${item.dataset} · 论文资产展示 / 非在线推理</span>`;
+              assets.appendChild(asset);
+            }
+          });
+          if (groupKey === "mainline") {
+            host.appendChild(block);
+          }
+        });
+      }
+
       async function refreshHealthAndModels() {
         const h = await apiJson("/api/v1/health");
         setStatus(h.ok && h.data.status === "ok");
         state.currentModel = h.data.current_model || null;
-        document.getElementById("currentModel").textContent = state.currentModel || "未选择";
+        state.currentDisplayName = h.data.current_display_name || state.currentModel;
+        document.getElementById("currentModel").textContent = state.currentDisplayName || "未选择";
 
         const m = await apiJson("/api/v1/models");
         if (!m.ok) {
           setRaw(m.data || m);
           return;
         }
-        const box = document.getElementById("modelButtons");
-        box.innerHTML = "";
-        (m.data.models || []).forEach((x) => {
-          const b = document.createElement("button");
-          b.className = "btn" + (x.name === state.currentModel ? " active" : "");
-          b.textContent = x.available ? x.name : `${x.name} (缺失)`;
-          b.disabled = !x.available;
-          b.onclick = () => switchModel(x.name);
-          box.appendChild(b);
-        });
+        state.modelCatalog = m.data.models || [];
+        state.modelGroups = m.data.groups || {};
+        renderSingleModelButtons(state.modelGroups);
+        renderCompareModelSelection(state.modelGroups);
       }
 
-      async function switchModel(name) {
+      async function switchModel(modelKey) {
         const r = await apiJson("/api/v1/models/switch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model_name: name }),
+          body: JSON.stringify({ model_name: modelKey }),
         });
         setRaw(r.data);
         if (r.ok) {
           state.currentModel = r.data.current_model;
-          document.getElementById("currentModel").textContent = state.currentModel;
-          refreshHealthAndModels();
+          await refreshHealthAndModels();
         }
       }
 
@@ -453,7 +749,10 @@
         state.selectedFile = null;
         document.getElementById("fileList").innerHTML = "";
         document.getElementById("previewImage").removeAttribute("src");
+        document.getElementById("detectSourcePreview").removeAttribute("src");
+        document.getElementById("selectedFileName").textContent = "未选择";
       }
+
       function renderFileList() {
         const ul = document.getElementById("fileList");
         ul.innerHTML = "";
@@ -465,6 +764,7 @@
           ul.appendChild(li);
         });
       }
+
       function selectFileByIndex(idx) {
         state.selectedFile = state.files[idx] || null;
         renderFileList();
@@ -473,6 +773,7 @@
           fillMetaFromFile(state.selectedFile);
         }
       }
+
       function loadFolderFiles() {
         const files = Array.from(document.getElementById("folderInput").files || []);
         state.files = files.filter((f) => f.type.startsWith("image/"));
@@ -483,19 +784,26 @@
           fillMetaFromFile(state.selectedFile);
         }
       }
+
       function fillMetaFromFile(file) {
         document.getElementById("metaSampleName").value = file.name;
         document.getElementById("metaImagePath").value = file.webkitRelativePath || file.name;
         document.getElementById("metaSource").value = file.webkitRelativePath ? "folder_upload" : "single_upload";
+        document.getElementById("selectedFileName").textContent = file.webkitRelativePath || file.name;
       }
+
       function updatePreview(file) {
-        const img = document.getElementById("previewImage");
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-          document.getElementById("metaImageSize").value = `${img.naturalWidth}x${img.naturalHeight}`;
-          drawOverlay([], img);
+        const preview = document.getElementById("previewImage");
+        const detectPreview = document.getElementById("detectSourcePreview");
+        const objectUrl = URL.createObjectURL(file);
+        preview.src = objectUrl;
+        detectPreview.src = objectUrl;
+        preview.onload = () => {
+          document.getElementById("metaImageSize").value = `${preview.naturalWidth}x${preview.naturalHeight}`;
+          drawOverlay([], detectPreview);
         };
       }
+
       function drawOverlay(detections, sourceImg) {
         const canvas = document.getElementById("overlayCanvas");
         const ctx = canvas.getContext("2d");
@@ -504,7 +812,7 @@
         canvas.width = Math.max(1, w);
         canvas.height = Math.max(1, h);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (sourceImg) ctx.drawImage(sourceImg, 0, 0, canvas.width, canvas.height);
+        if (sourceImg && sourceImg.complete) ctx.drawImage(sourceImg, 0, 0, canvas.width, canvas.height);
         ctx.strokeStyle = "#ef4444";
         ctx.fillStyle = "#ef4444";
         ctx.lineWidth = 2;
@@ -524,6 +832,7 @@
         const avg = confs.length ? confs.reduce((a, b) => a + b, 0) / confs.length : null;
         return { count: ds.length, max, avg };
       }
+
       function renderStats(result) {
         const s = statFromResult(result || {});
         document.getElementById("statModel").textContent = result.model_name || "-";
@@ -535,7 +844,7 @@
         ul.innerHTML = "";
         (result.detections || []).forEach((d, i) => {
           const li = document.createElement("li");
-          li.textContent = `#${i + 1} ${d.class_name || d.cls} conf=${d.conf} box=${JSON.stringify(d.xyxy)}`;
+          li.textContent = `#${i + 1} ${d.class_name || d.cls} | conf=${d.conf} | box=${JSON.stringify(d.xyxy)}`;
           ul.appendChild(li);
         });
         if ((result.detections || []).length === 0) {
@@ -548,13 +857,13 @@
       async function runDetect() {
         if (!state.selectedFile) {
           setRaw({ error: "请先加载并选择图片" });
+          showPage("load");
           return;
         }
         const fd = new FormData();
         fd.append("image", state.selectedFile);
         if (state.currentModel) fd.append("model_name", state.currentModel);
-        const conf = confValue();
-        if (conf != null) fd.append("conf", String(conf));
+        fd.append("conf", String(confValue("confInput")));
         const res = await fetch("/api/v1/infer/upload", { method: "POST", body: fd });
         let data = {};
         try { data = await res.json(); } catch {}
@@ -562,19 +871,26 @@
         if (!res.ok) return;
         state.lastResult = data;
         renderStats(data);
-        const img = document.getElementById("previewImage");
+        const img = document.getElementById("detectSourcePreview");
         if (img && img.src) drawOverlay(data.detections || [], img);
+        showPage("detect");
       }
 
       async function runCompare() {
         if (!state.selectedFile) {
           setRaw({ error: "请先加载并选择图片" });
+          showPage("load");
+          return;
+        }
+        const selected = Array.from(document.querySelectorAll("#compareModelSelection input[type='checkbox']:checked")).map((x) => x.value);
+        if (!selected.length) {
+          setRaw({ error: "请至少选择一个模型进行对比" });
           return;
         }
         const fd = new FormData();
         fd.append("image", state.selectedFile);
-        const conf = confValue();
-        if (conf != null) fd.append("conf", String(conf));
+        fd.append("conf", String(confValue("compareConfInput")));
+        fd.append("model_names", selected.join(","));
         const res = await fetch("/api/v1/infer/compare", { method: "POST", body: fd });
         let data = {};
         try { data = await res.json(); } catch {}
@@ -585,14 +901,25 @@
         grid.innerHTML = "";
         state.compareResults.forEach((r) => {
           const div = document.createElement("div");
-          div.className = "compare-item";
+          div.className = "compare-card";
+          const title = document.createElement("h4");
+          title.textContent = r.model_name || "unknown";
+          div.appendChild(title);
+          const body = document.createElement("div");
           if (r.error) {
-            div.textContent = `${r.model_name}: ${r.error}`;
+            body.textContent = r.error;
           } else {
-            div.textContent = `${r.model_name} | det=${(r.detections || []).length} | latency=${r.latency_ms}ms`;
+            const detCount = (r.detections || []).length;
+            body.innerHTML = `
+              <div>耗时：${r.latency_ms} ms</div>
+              <div>检测数：${detCount}</div>
+              <div>图片尺寸：${r.image_size ? `${r.image_size.width}x${r.image_size.height}` : "-"}</div>
+            `;
           }
+          div.appendChild(body);
           grid.appendChild(div);
         });
+        showPage("compare");
       }
 
       function buildSampleMeta() {
@@ -607,12 +934,12 @@
       }
 
       async function saveSampleMetaOnly() {
-          setRaw({ info: "样本信息仅在保存复核记录时落库。请先完成一次检测后点击“保存复核”" });
+        setRaw({ info: "样本信息会在点击“保存复核”时一起写入数据库。" });
       }
 
       async function saveDiagnosisRecord() {
         if (!state.lastResult) {
-          setRaw({ error: "请先执行检测，再保存复核记录" });
+          setRaw({ error: "请先执行一次单模型检测，再保存复核记录" });
           return;
         }
         const doctorNote = {
@@ -634,6 +961,7 @@
         if (r.ok) {
           document.getElementById("saveStatus").textContent = `记录已保存: ${r.data.record_uuid}`;
           await loadRecordList();
+          showPage("records");
         }
       }
 
@@ -643,20 +971,30 @@
           setRaw(r.data);
           return;
         }
-        const sel = document.getElementById("recordSelect");
-        sel.innerHTML = "";
-        (r.data.records || []).forEach((x) => {
-          const op = document.createElement("option");
-          op.value = x.record_uuid;
-          op.textContent = `${x.created_at} | ${x.model_name} | det=${x.detections_count} | ${x.record_uuid}`;
-          sel.appendChild(op);
+        const select = document.getElementById("recordSelect");
+        const list = document.getElementById("recordsList");
+        select.innerHTML = "";
+        list.innerHTML = "";
+        (r.data.records || []).forEach((x, idx) => {
+          const option = document.createElement("option");
+          option.value = x.record_uuid;
+          option.textContent = `${x.created_at} | ${x.model_name} | det=${x.detections_count}`;
+          select.appendChild(option);
+
+          const li = document.createElement("li");
+          li.textContent = `${x.sample_name || "未命名样本"} | ${x.model_name} | ${x.record_uuid}`;
+          li.onclick = () => {
+            select.value = x.record_uuid;
+          };
+          if (idx === 0) li.className = "active";
+          list.appendChild(li);
         });
       }
 
       function exportSelectedReport() {
         const id = document.getElementById("recordSelect").value;
         if (!id) {
-          setRaw({ error: "请先选择记录" });
+          setRaw({ error: "请先选择一条历史记录" });
           return;
         }
         window.open(`/api/v1/report/export?record_uuid=${encodeURIComponent(id)}`, "_blank");
@@ -671,6 +1009,11 @@
           renderFileList();
           updatePreview(file);
           fillMetaFromFile(file);
+          showPage("load");
+        });
+        document.getElementById("folderInput").addEventListener("change", () => {
+          loadFolderFiles();
+          showPage("load");
         });
         await refreshHealthAndModels();
         await loadRecordList();

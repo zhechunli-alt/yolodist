@@ -178,6 +178,8 @@ def _error_response_from_exception(exc: Exception) -> Tuple[Response, int]:
         return jsonify({"error": str(exc)}), 404
     if isinstance(exc, KeyError):
         return jsonify({"error": str(exc)}), 400
+    if isinstance(exc, ValueError):
+        return jsonify({"error": str(exc)}), 400
     if isinstance(exc, RuntimeError):
         return jsonify({"error": str(exc)}), 503
     return jsonify({"error": str(exc)}), 500
@@ -234,11 +236,13 @@ def create_app() -> Flask:
 
     @app.get("/api/v1/health")
     def health() -> Any:
+        current_spec = registry.current_model_spec()
         return jsonify(
             {
                 "status": "ok",
                 "time_utc": utc_now_iso(),
-                "current_model": registry.current_model(),
+                "current_model": current_spec.key if current_spec else None,
+                "current_display_name": current_spec.display_name if current_spec else None,
                 "db_path": DB_PATH.as_posix(),
             }
         )
@@ -355,9 +359,11 @@ def create_app() -> Flask:
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
 
-        available_models = [m.name for m in registry.list_models() if m.exists]
+        available_models = [
+            m.key for m in registry.list_models() if m.exists and m.runtime_supported
+        ]
         if not available_models:
-            return jsonify({"error": "no available model in weights/"}), 503
+            return jsonify({"error": "no runtime-supported model is available"}), 503
 
         requested_models: List[str]
         if not model_names_raw.strip():
@@ -559,4 +565,3 @@ if __name__ == "__main__":
     host = os.getenv("BACKEND_HOST", "127.0.0.1")
     port = int(os.getenv("BACKEND_PORT", "5000"))
     app.run(host=host, port=port, debug=False)
-
