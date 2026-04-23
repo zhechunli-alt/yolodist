@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import csv
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
@@ -19,6 +20,9 @@ from .model_registry import ModelRegistry
 
 DB_PATH = ROOT / "service" / "backend" / "data" / "inference_logs.db"
 UPLOAD_DIR = ROOT / "service" / "backend" / "data" / "uploads"
+EXTERNAL_COMPARE_TABLE = ROOT / "runs" / "paper_tables" / "deeppcb_external_model_pool.csv"
+DEMO_SAMPLES_DIR = ROOT / "assets" / "demo_samples"
+GENERATED_FIGURES_DIR = ROOT / "runs" / "paper_figures" / "generated"
 ALLOWED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
 
@@ -198,6 +202,103 @@ def _safe_json_load(raw: str | None) -> Any:
         return None
 
 
+def load_external_comparison_assets(csv_path: Path) -> List[Dict[str, Any]]:
+    if not csv_path.exists():
+        return []
+    name_map = {
+        "ssdlite320_mobilenet_v3_large": "SSDLite-MobileNetV3",
+        "retinanet_r50_fpn": "RetinaNet-R50-FPN",
+        "fcos_r50_fpn": "FCOS-R50-FPN",
+        "fasterrcnn_mnv3_fpn": "FasterRCNN-MNV3-FPN",
+        "fasterrcnn_r50_fpn": "FasterRCNN-R50-FPN",
+        "fasterrcnn_r50_fpn_v2": "FasterRCNN-R50-FPN-v2",
+        "fasterrcnn_mnv3_320_fpn": "FasterRCNN-MNV3-320",
+    }
+    runtime_key_map = {
+        "ssdlite320_mobilenet_v3_large": "cmp_ssdlite_mnv3",
+        "retinanet_r50_fpn": "cmp_retinanet_r50",
+        "fcos_r50_fpn": "cmp_fcos_r50",
+        "fasterrcnn_mnv3_fpn": "cmp_frcnn_mnv3_fpn",
+        "fasterrcnn_r50_fpn": "cmp_frcnn_r50",
+        "fasterrcnn_r50_fpn_v2": "cmp_frcnn_r50_v2",
+        "fasterrcnn_mnv3_320_fpn": "cmp_frcnn_mnv3_320",
+    }
+    items: List[Dict[str, Any]] = []
+    with csv_path.open("r", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        for row in reader:
+            model = (row.get("model") or "").strip()
+            if not model:
+                continue
+            if model in {"student_epfa", "yolov8n", "yolov10n", "yolox_nano"}:
+                continue
+            status = (row.get("status") or "").strip().lower()
+            if status == "discard":
+                continue
+            def parse_float(key: str) -> float | None:
+                val = (row.get(key) or "").strip()
+                if not val:
+                    return None
+                try:
+                    return float(val)
+                except ValueError:
+                    return None
+            items.append(
+                {
+                    "model": model,
+                    "runtime_key": runtime_key_map.get(model, model),
+                    "display_name": name_map.get(model, model),
+                    "dataset": "DeepPCB",
+                    "params_m": parse_float("params_m"),
+                    "precision": parse_float("precision"),
+                    "recall": parse_float("recall"),
+                    "map50": parse_float("map50"),
+                    "map5095": parse_float("map5095"),
+                    "status": status or "candidate",
+                    "notes": (row.get("notes") or "").strip(),
+                }
+            )
+    return items
+
+
+def comparison_asset_figure_urls(model: str) -> Dict[str, str | None]:
+    mapping = {
+        "prediction_image": "_single_pred.png",
+        "pr_curve_image": "_pr_curve.png",
+        "confusion_image": "_confusion_matrix.png",
+    }
+    result: Dict[str, str | None] = {}
+    for key, suffix in mapping.items():
+        filename = f"deeppcb_{model}{suffix}"
+        path = GENERATED_FIGURES_DIR / filename
+        result[key] = (
+            f"/api/v1/comparison-assets/file/{filename}" if path.exists() else None
+        )
+    return result
+
+
+def build_demo_sample_catalog(root: Path) -> Dict[str, Any]:
+    dataset_labels = {
+        "deeppcb": "DeepPCB",
+        "pku": "PKU-Market-PCB",
+        "dspcbsd_plus": "DsPCBSD+",
+    }
+    catalog: Dict[str, Any] = {}
+    for key, label in dataset_labels.items():
+        dataset_dir = root / key
+        if not dataset_dir.exists():
+            continue
+        entry: Dict[str, Any] = {"label": label}
+        for group in ("single", "folder"):
+            group_dir = dataset_dir / group
+            files = sorted(
+                [p.name for p in group_dir.iterdir() if p.is_file() and p.suffix.lower() in ALLOWED_IMAGE_SUFFIXES]
+            ) if group_dir.exists() else []
+            entry[group] = files
+        catalog[key] = entry
+    return catalog
+
+
 def create_app() -> Flask:
     init_db(DB_PATH)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -268,6 +369,7 @@ def create_app() -> Flask:
             return jsonify({"error": "model_name is required"}), 400
         try:
             selected_path = registry.switch(str(model_name))
+            infer_engine.prewarm_model(str(model_name))
             return jsonify(
                 {
                     "ok": True,
@@ -383,6 +485,12 @@ def create_app() -> Flask:
             if not requested_models:
                 return jsonify({"error": "no valid model_names provided"}), 400
 
+        infer_engine.warm_for_compare(
+            image_path=dst_path.as_posix(),
+            model_names=requested_models,
+            conf=conf,
+        )
+
         results: List[Dict[str, Any]] = []
         for name in requested_models:
             try:
@@ -398,6 +506,37 @@ def create_app() -> Flask:
                 "model_names": requested_models,
             }
         )
+
+    @app.get("/api/v1/comparison-assets")
+    def comparison_assets() -> Any:
+        assets = load_external_comparison_assets(EXTERNAL_COMPARE_TABLE)
+        for item in assets:
+            item.update(comparison_asset_figure_urls(str(item.get("model", ""))))
+        return jsonify({"assets": assets})
+
+    @app.get("/api/v1/comparison-assets/file/<filename>")
+    def comparison_assets_file(filename: str) -> Any:
+        safe_name = Path(filename).name
+        path = GENERATED_FIGURES_DIR / safe_name
+        if not path.exists():
+            return jsonify({"error": "comparison asset file not found"}), 404
+        return send_file(path)
+
+    @app.get("/api/v1/sample-sets")
+    def sample_sets() -> Any:
+        return jsonify({"datasets": build_demo_sample_catalog(DEMO_SAMPLES_DIR)})
+
+    @app.get("/api/v1/sample-file/<dataset>/<group>/<filename>")
+    def sample_file(dataset: str, group: str, filename: str) -> Any:
+        if dataset not in {"deeppcb", "pku", "dspcbsd_plus"}:
+            return jsonify({"error": "invalid dataset"}), 400
+        if group not in {"single", "folder"}:
+            return jsonify({"error": "invalid sample group"}), 400
+        safe_name = Path(filename).name
+        path = DEMO_SAMPLES_DIR / dataset / group / safe_name
+        if not path.exists():
+            return jsonify({"error": "sample file not found"}), 404
+        return send_file(path)
 
     @app.post("/api/v1/records/save")
     def save_record() -> Any:

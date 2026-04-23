@@ -167,7 +167,7 @@ class ModelRegistry:
                 "dataset": "DeepPCB",
                 "role": "comparison",
                 "path": ROOT / "runs/deeppcb_compare/fasterrcnn_mnv3_fpn/weights/best.pt",
-                "runtime_supported": False,
+                "runtime_supported": True,
             },
             "cmp_retinanet_r50": {
                 "display_name": "Compare / RetinaNet-R50-FPN",
@@ -175,7 +175,7 @@ class ModelRegistry:
                 "dataset": "DeepPCB",
                 "role": "comparison",
                 "path": ROOT / "runs/deeppcb_compare/retinanet_r50_fpn/weights/best.pt",
-                "runtime_supported": False,
+                "runtime_supported": True,
             },
             "cmp_fcos_r50": {
                 "display_name": "Compare / FCOS-R50-FPN",
@@ -183,7 +183,7 @@ class ModelRegistry:
                 "dataset": "DeepPCB",
                 "role": "comparison",
                 "path": ROOT / "runs/deeppcb_compare/fcos_r50_fpn/weights/best.pt",
-                "runtime_supported": False,
+                "runtime_supported": True,
             },
             "cmp_frcnn_r50": {
                 "display_name": "Compare / FasterRCNN-R50-FPN",
@@ -191,7 +191,7 @@ class ModelRegistry:
                 "dataset": "DeepPCB",
                 "role": "comparison",
                 "path": ROOT / "runs/deeppcb_compare/fasterrcnn_r50_fpn/weights/best.pt",
-                "runtime_supported": False,
+                "runtime_supported": True,
             },
             "cmp_frcnn_r50_v2": {
                 "display_name": "Compare / FasterRCNN-R50-FPN-v2",
@@ -199,7 +199,7 @@ class ModelRegistry:
                 "dataset": "DeepPCB",
                 "role": "comparison",
                 "path": ROOT / "runs/deeppcb_compare/fasterrcnn_r50_fpn_v2/weights/best.pt",
-                "runtime_supported": False,
+                "runtime_supported": True,
             },
         }
         self._specs: Dict[str, ModelSpec] = {}
@@ -269,6 +269,11 @@ class ModelRegistry:
         if model_key not in self._specs:
             raise KeyError(f"Unknown model key: {model_key}")
         return self._specs[model_key].path
+
+    def get_model_spec(self, model_key: str) -> ModelSpec:
+        if model_key not in self._specs:
+            raise KeyError(f"Unknown model key: {model_key}")
+        return self._specs[model_key]
 
     def is_runtime_supported(self, model_key: str) -> bool:
         if model_key not in self._specs:

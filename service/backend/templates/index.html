@@ -466,6 +466,33 @@
         color: var(--muted);
         font-size: 12px;
       }
+      .asset-preview {
+        display: block;
+        width: 100%;
+        margin-top: 8px;
+        border: 1px solid #a9b4bf;
+        border-radius: 10px;
+        background: #f7fafc;
+      }
+      .asset-preview-empty {
+        min-height: 120px;
+        display: grid;
+        place-items: center;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .asset-diagnostic-strip {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+        margin-top: 8px;
+      }
+      .asset-diagnostic {
+        width: 100%;
+        border: 1px solid #a9b4bf;
+        border-radius: 10px;
+        background: #f7fafc;
+      }
       .row {
         display: flex;
         flex-wrap: wrap;
@@ -498,6 +525,51 @@
         color: var(--muted);
         font-size: 11px;
         text-align: center;
+      }
+      .loading-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(214, 222, 230, 0.68);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      .loading-overlay.active {
+        display: flex;
+      }
+      .loading-dialog {
+        min-width: 240px;
+        max-width: 360px;
+        border: 1px solid var(--line-strong);
+        border-radius: 14px;
+        background: linear-gradient(180deg, #fbfdff 0%, #e2e9f0 100%);
+        box-shadow: var(--shadow);
+        padding: 16px 18px;
+        display: grid;
+        gap: 10px;
+        text-align: center;
+      }
+      .loading-spinner {
+        width: 32px;
+        height: 32px;
+        margin: 0 auto;
+        border: 3px solid #c9d3dc;
+        border-top-color: var(--brand);
+        border-radius: 999px;
+        animation: loading-spin 0.9s linear infinite;
+      }
+      .loading-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: var(--text);
+      }
+      .loading-desc {
+        font-size: 12px;
+        color: var(--muted);
+      }
+      @keyframes loading-spin {
+        to { transform: rotate(360deg); }
       }
       .mini-status {
         color: var(--muted);
@@ -546,7 +618,7 @@
       }
       .compare-grid {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
         min-width: 0;
       }
@@ -555,12 +627,18 @@
         border-radius: 10px;
         padding: 8px;
         display: grid;
+        grid-template-rows: minmax(40px, auto) auto auto;
+        align-content: start;
         gap: 6px;
         background: linear-gradient(180deg, #f9fbfc 0%, #e2e9f0 100%);
       }
       .compare-card h4 {
         margin: 0;
         font-size: 14px;
+        line-height: 1.35;
+        display: flex;
+        align-items: flex-start;
+        min-height: 40px;
       }
       .compare-meta {
         display: grid;
@@ -586,7 +664,7 @@
       }
       .compare-visual {
         display: grid;
-        grid-template-columns: minmax(0, 320px) 1fr;
+        grid-template-columns: 1fr;
         gap: 8px;
         min-width: 0;
       }
@@ -711,6 +789,13 @@
     </style>
   </head>
   <body>
+    <div id="loadingOverlay" class="loading-overlay" aria-live="polite" aria-busy="true">
+      <div class="loading-dialog">
+        <div class="loading-spinner"></div>
+        <div id="loadingTitle" class="loading-title">数据载入中</div>
+        <div id="loadingDesc" class="loading-desc">请稍候，系统正在整理文件与预览信息</div>
+      </div>
+    </div>
     <div class="app">
       <header class="topbar">
         <div class="title-wrap">
@@ -749,6 +834,8 @@
               <div class="row">
                 <button class="btn-secondary" onclick="clearFiles()">清空列表</button>
               </div>
+              <div class="panel-header"><h3>样本数据</h3></div>
+              <div id="sampleSetList" class="asset-list"></div>
               <div class="pager-row">
                 <button class="btn-secondary" onclick="changeFilePage(-1)">上一页</button>
                 <span id="loadFilePager" class="pager-status">第 0 / 0 页</span>
@@ -843,7 +930,7 @@
       </section>
 
       <section id="page-compare" class="page">
-        <div class="grid-3">
+        <div class="grid-2">
           <div class="col">
             <div class="panel">
               <div class="panel-header"><h3>对比模型选择</h3></div>
@@ -853,7 +940,7 @@
               <button class="btn" onclick="runCompare()">对当前图片运行多模型对比</button>
             </div>
             <div class="panel">
-              <div class="panel-header"><h3>对比模型</h3></div>
+              <div class="panel-header"><h3>其它对比模型</h3></div>
               <div id="comparisonAssets" class="asset-list"></div>
             </div>
           </div>
@@ -863,13 +950,8 @@
               <div id="compareGrid" class="compare-grid"></div>
             </div>
           </div>
-          <div class="col">
-            <div class="panel" style="grid-template-rows:auto 1fr;">
-              <div class="panel-header"><h3>返回数据</h3></div>
-              <div id="rawOutput" class="raw-box">{ "提示": "等待操作..." }</div>
-            </div>
-          </div>
         </div>
+        <div id="rawOutput" class="raw-box" style="display:none;"></div>
       </section>
 
       <section id="page-records" class="page">
@@ -957,6 +1039,9 @@
         singleDataset: "DeepPCB",
         compareDataset: "DeepPCB",
         compareSelectedModels: [],
+        compareSelectionsByDataset: {},
+        comparisonAssets: [],
+        sampleSets: {},
         fileResults: {},
         fileStatuses: {},
         modelFileResults: {},
@@ -1000,6 +1085,100 @@
 
       function setRaw(obj) {
         document.getElementById("rawOutput").textContent = JSON.stringify(obj, null, 2);
+      }
+
+      function refreshCompareSelectedModels() {
+        const mainline = state.compareSelectionsByDataset[state.compareDataset] || [];
+        const assets = (state.comparisonAssets || [])
+          .filter((item) => (item.dataset || "DeepPCB") === state.compareDataset)
+          .map((item) => item.runtime_key || item.model);
+        state.compareSelectedModels = [...mainline, ...assets];
+      }
+
+      function setLoading(active, title = "数据载入中", desc = "请稍候，系统正在整理文件与预览信息") {
+        const overlay = document.getElementById("loadingOverlay");
+        const titleEl = document.getElementById("loadingTitle");
+        const descEl = document.getElementById("loadingDesc");
+        titleEl.textContent = title;
+        descEl.textContent = desc;
+        overlay.className = active ? "loading-overlay active" : "loading-overlay";
+      }
+
+      function nextPaint() {
+        return new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      }
+
+      function datasetAssetKey(dataset) {
+        if (dataset === "DeepPCB") return "deeppcb";
+        if (dataset === "PKU-Market-PCB") return "pku";
+        if (dataset === "DsPCBSD+") return "dspcbsd_plus";
+        return "deeppcb";
+      }
+
+      function renderSampleSets() {
+        const host = document.getElementById("sampleSetList");
+        if (!host) return;
+        host.innerHTML = "";
+        Object.entries(state.sampleSets || {}).forEach(([key, info]) => {
+          const box = document.createElement("div");
+          box.className = "asset-item";
+          box.innerHTML = `
+            <strong>${info.label}</strong>
+            <div class="row">
+              <button class="btn-secondary" type="button" onclick="loadSampleSet('${key}','single')">载入单张样本</button>
+              <button class="btn-secondary" type="button" onclick="loadSampleSet('${key}','folder')">载入小样本文件夹</button>
+            </div>
+          `;
+          host.appendChild(box);
+        });
+      }
+
+      async function loadSampleSet(datasetKey, group) {
+        const dataset = state.sampleSets[datasetKey];
+        if (!dataset || !dataset[group] || !dataset[group].length) {
+          setRaw({ error: "样本数据不存在" });
+          return;
+        }
+        setLoading(true, "数据载入中", "正在读取样本数据");
+        await nextPaint();
+        const files = [];
+        try {
+          for (const name of dataset[group]) {
+            const res = await fetch(`/api/v1/sample-file/${datasetKey}/${group}/${encodeURIComponent(name)}`);
+            if (!res.ok) continue;
+            const blob = await res.blob();
+            files.push(new File([blob], name, { type: blob.type || "image/jpeg" }));
+          }
+          if (!files.length) {
+            setRaw({ error: "样本加载失败" });
+            return;
+          }
+          state.files = files;
+          state.selectedFile = files[0];
+          state.filePage = 1;
+          state.modelFileResults = {};
+          state.modelFileStatuses = {};
+          state.lastFolderRunModel = null;
+          syncActiveModelStores();
+          renderFileList();
+          setPauseButtonState();
+          updatePreview(state.selectedFile);
+          fillMetaFromFile(state.selectedFile);
+          restoreFileResult(state.selectedFile);
+          const labelMap = {
+            deeppcb: "DeepPCB",
+            pku: "PKU-Market-PCB",
+            dspcbsd_plus: "DsPCBSD+",
+          };
+          const targetDataset = labelMap[datasetKey] || "DeepPCB";
+          state.singleDataset = targetDataset;
+          state.compareDataset = targetDataset;
+          renderSingleModelButtons(state.modelGroups);
+          renderCompareModelSelection(state.modelGroups);
+          showPage("load");
+        } finally {
+          setLoading(false);
+        }
       }
 
       function setStatus(ok) {
@@ -1144,15 +1323,6 @@
         switchHost.innerHTML = "";
         const assets = document.getElementById("comparisonAssets");
         assets.innerHTML = "";
-        const defaultKeys = new Set([
-          "deeppcb_student_epfa",
-          "deeppcb_student_plain",
-          "deeppcb_distill_epfa",
-          "deeppcb_teacher",
-        ]);
-        if (!state.compareSelectedModels.length) {
-          state.compareSelectedModels = Array.from(defaultKeys);
-        }
         const onlineModels = [
           ...(groups.mainline || []),
           ...(groups.teacher || []),
@@ -1174,6 +1344,13 @@
         if (datasets.length && !datasets.includes(state.compareDataset)) {
           state.compareDataset = datasets[0];
         }
+        datasets.forEach((dataset) => {
+          if (!state.compareSelectionsByDataset[dataset]) {
+            const defaults = (byDataset.get(dataset) || []).map((item) => item.key);
+            state.compareSelectionsByDataset[dataset] = defaults;
+          }
+        });
+        refreshCompareSelectedModels();
         datasets.forEach((dataset) => {
           const button = document.createElement("button");
           button.type = "button";
@@ -1202,34 +1379,35 @@
             const input = label.querySelector("input");
             input.addEventListener("change", (event) => {
               const checked = event.target.checked;
+              const selected = new Set(state.compareSelectionsByDataset[dataset] || []);
               if (checked) {
-                if (!state.compareSelectedModels.includes(item.key)) {
-                  state.compareSelectedModels.push(item.key);
-                }
+                selected.add(item.key);
               } else {
-                state.compareSelectedModels = state.compareSelectedModels.filter((key) => key !== item.key);
+                selected.delete(item.key);
               }
+              state.compareSelectionsByDataset[dataset] = Array.from(selected);
+              refreshCompareSelectedModels();
             });
             host.appendChild(label);
           });
         });
+        renderComparisonAssets();
+      }
 
-        const paperAssetKeys = new Set([
-          "cmp_frcnn_mnv3_fpn",
-          "cmp_retinanet_r50",
-          "cmp_fcos_r50",
-          "cmp_frcnn_r50",
-          "cmp_frcnn_r50_v2",
-        ]);
-        (groups.comparison || [])
-          .filter((item) => paperAssetKeys.has(item.key))
+      function renderComparisonAssets() {
+        const assets = document.getElementById("comparisonAssets");
+        assets.innerHTML = "";
+        (state.comparisonAssets || [])
+          .filter((item) => (item.dataset || "DeepPCB") === state.compareDataset)
           .forEach((item) => {
-            const asset = document.createElement("div");
-            asset.className = "asset-item";
-            const displayName = item.display_name.replace(/^Compare\s*\/\s*/i, "");
-            asset.innerHTML = `<strong>${displayName}</strong><span>${item.dataset}</span>`;
-            assets.appendChild(asset);
-          });
+          const asset = document.createElement("div");
+          asset.className = "asset-item";
+          asset.innerHTML = `
+            <strong>${item.display_name || item.model}</strong>
+          `;
+          assets.appendChild(asset);
+        });
+        refreshCompareSelectedModels();
       }
 
       async function refreshHealthAndModels() {
@@ -1249,6 +1427,16 @@
         state.modelGroups = m.data.groups || {};
         renderSingleModelButtons(state.modelGroups);
         renderCompareModelSelection(state.modelGroups);
+        const assetsResp = await apiJson("/api/v1/comparison-assets");
+        if (assetsResp.ok) {
+          state.comparisonAssets = assetsResp.data.assets || [];
+          renderComparisonAssets();
+        }
+        const samplesResp = await apiJson("/api/v1/sample-sets");
+        if (samplesResp.ok) {
+          state.sampleSets = samplesResp.data.datasets || {};
+          renderSampleSets();
+        }
       }
 
       async function switchModel(modelKey) {
@@ -1391,20 +1579,26 @@
         }
       }
 
-      function loadFolderFiles() {
+      async function loadFolderFiles() {
+        setLoading(true, "数据载入中", "正在整理文件夹中的图片");
+        await nextPaint();
         const files = Array.from(document.getElementById("folderInput").files || []);
-        state.files = files.filter((f) => f.type.startsWith("image/"));
-        state.filePage = 1;
-        state.modelFileResults = {};
-        state.modelFileStatuses = {};
-        syncActiveModelStores();
-        if (state.files.length > 0) state.selectedFile = state.files[0];
-        renderFileList();
-        setPauseButtonState();
-        if (state.selectedFile) {
-          updatePreview(state.selectedFile);
-          fillMetaFromFile(state.selectedFile);
-          restoreFileResult(state.selectedFile);
+        try {
+          state.files = files.filter((f) => f.type.startsWith("image/"));
+          state.filePage = 1;
+          state.modelFileResults = {};
+          state.modelFileStatuses = {};
+          syncActiveModelStores();
+          if (state.files.length > 0) state.selectedFile = state.files[0];
+          renderFileList();
+          setPauseButtonState();
+          if (state.selectedFile) {
+            updatePreview(state.selectedFile);
+            fillMetaFromFile(state.selectedFile);
+            restoreFileResult(state.selectedFile);
+          }
+        } finally {
+          setLoading(false);
         }
       }
 
@@ -1478,6 +1672,9 @@
         document.getElementById("statAvgConf").textContent = s.avg == null ? "-" : s.avg.toFixed(4);
         const ul = document.getElementById("detList");
         ul.innerHTML = "";
+        const titleLi = document.createElement("li");
+        titleLi.textContent = "原始检测框数据";
+        ul.appendChild(titleLi);
         (result.detections || []).forEach((d, i) => {
           const li = document.createElement("li");
           li.textContent = `#${i + 1} ${d.class_name || d.cls} | conf=${d.conf} | box=${JSON.stringify(d.xyxy)}`;
@@ -1503,6 +1700,9 @@
         if (recordsPreview && recordsPreview.src) {
           drawOverlayToCanvas(document.getElementById("recordsOverlayCanvas"), result.detections || [], recordsPreview);
         }
+        const titleLi = document.createElement("li");
+        titleLi.textContent = "原始检测框数据";
+        ul.appendChild(titleLi);
         (result.detections || []).forEach((d, i) => {
           const li = document.createElement("li");
           li.textContent = `#${i + 1} ${d.class_name || d.cls} | conf=${d.conf} | box=${JSON.stringify(d.xyxy)}`;
@@ -1832,6 +2032,9 @@
             canvasWrap.innerHTML = `<div class="mini-status">检测叠加图</div><div class="compare-canvas-frame"><canvas></canvas></div>`;
             const list = document.createElement("ul");
             list.className = "compare-detail-list";
+            const titleLi = document.createElement("li");
+            titleLi.textContent = "原始检测框数据";
+            list.appendChild(titleLi);
             (r.detections || []).forEach((d, idx) => {
               const li = document.createElement("li");
               li.textContent = `#${idx + 1} ${d.class_name || d.cls} | conf=${d.conf} | box=${JSON.stringify(d.xyxy)}`;
@@ -1980,17 +2183,30 @@
 
       window.addEventListener("DOMContentLoaded", async () => {
         document.getElementById("singleFileInput").addEventListener("change", (e) => {
-          const file = e.target.files && e.target.files[0];
-          if (!file) return;
-          state.files = [file];
-          state.selectedFile = file;
-          renderFileList();
-          updatePreview(file);
-          fillMetaFromFile(file);
-          showPage("load");
+          setLoading(true, "数据载入中", "正在读取所选图片");
+          requestAnimationFrame(() => {
+            try {
+              const file = e.target.files && e.target.files[0];
+              if (!file) return;
+              state.files = [file];
+              state.selectedFile = file;
+              state.filePage = 1;
+              state.modelFileResults = {};
+              state.modelFileStatuses = {};
+              state.lastFolderRunModel = null;
+              syncActiveModelStores();
+              renderFileList();
+              updatePreview(file);
+              fillMetaFromFile(file);
+              restoreFileResult(file);
+              showPage("load");
+            } finally {
+              setLoading(false);
+            }
+          });
         });
-        document.getElementById("folderInput").addEventListener("change", () => {
-          loadFolderFiles();
+        document.getElementById("folderInput").addEventListener("change", async () => {
+          await loadFolderFiles();
           showPage("load");
         });
         document.getElementById("recordSelect").addEventListener("change", (e) => {
