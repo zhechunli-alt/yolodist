@@ -33,20 +33,20 @@ class ModelRegistry:
                 "path": self.weights_dir / "best_deeppcb_student_epfa.pt",
                 "runtime_supported": True,
             },
-            "deeppcb_baseline": {
-                "display_name": "DeepPCB / Baseline-YOLO11n",
-                "group": "mainline",
-                "dataset": "DeepPCB",
-                "role": "baseline",
-                "path": self.weights_dir / "best_deeppcb_baseline.pt",
-                "runtime_supported": True,
-            },
             "deeppcb_student_plain": {
                 "display_name": "DeepPCB / Student-Plain",
                 "group": "mainline",
                 "dataset": "DeepPCB",
                 "role": "student",
                 "path": self.weights_dir / "best_deeppcb_student_plain.pt",
+                "runtime_supported": True,
+            },
+            "deeppcb_distill_plain": {
+                "display_name": "DeepPCB / Distill-Plain",
+                "group": "mainline",
+                "dataset": "DeepPCB",
+                "role": "distill",
+                "path": self.weights_dir / "best_deeppcb_distill_plain.pt",
                 "runtime_supported": True,
             },
             "deeppcb_distill_epfa": {
@@ -57,8 +57,72 @@ class ModelRegistry:
                 "path": self.weights_dir / "best_deeppcb_distill_epfa.pt",
                 "runtime_supported": True,
             },
+            "pku_student_plain": {
+                "display_name": "PKU / Student-Plain",
+                "group": "mainline",
+                "dataset": "PKU-Market-PCB",
+                "role": "student",
+                "path": ROOT / "runs/pku_market_pcb_modified/student_plain/weights/best.pt",
+                "runtime_supported": True,
+            },
+            "pku_student_epfa": {
+                "display_name": "PKU / Student-EPFA",
+                "group": "mainline",
+                "dataset": "PKU-Market-PCB",
+                "role": "student",
+                "path": ROOT / "runs/pku_market_pcb_epfa/student_epfa/weights/best.pt",
+                "runtime_supported": True,
+            },
+            "pku_distill_plain": {
+                "display_name": "PKU / Distill-Plain",
+                "group": "mainline",
+                "dataset": "PKU-Market-PCB",
+                "role": "distill",
+                "path": self.weights_dir / "best_pku_distill_plain.pt",
+                "runtime_supported": True,
+            },
+            "pku_distill_epfa": {
+                "display_name": "PKU / Distill-EPFA",
+                "group": "mainline",
+                "dataset": "PKU-Market-PCB",
+                "role": "distill",
+                "path": ROOT / "runs/pku_market_pcb_distill_epfa/distill_epfa_fair/weights/best.pt",
+                "runtime_supported": True,
+            },
+            "dspcbsd_student_plain": {
+                "display_name": "DsPCBSD+ / Student-Plain",
+                "group": "mainline",
+                "dataset": "DsPCBSD+",
+                "role": "student",
+                "path": ROOT / "runs/dspcbsd_plus_modified/student_plain/weights/best.pt",
+                "runtime_supported": True,
+            },
+            "dspcbsd_student_epfa": {
+                "display_name": "DsPCBSD+ / Student-EPFA",
+                "group": "mainline",
+                "dataset": "DsPCBSD+",
+                "role": "student",
+                "path": ROOT / "runs/dspcbsd_plus_epfa/student_epfa/weights/best.pt",
+                "runtime_supported": True,
+            },
+            "dspcbsd_distill_plain": {
+                "display_name": "DsPCBSD+ / Distill-Plain",
+                "group": "mainline",
+                "dataset": "DsPCBSD+",
+                "role": "distill",
+                "path": self.weights_dir / "best_dspcbsd_distill_plain.pt",
+                "runtime_supported": True,
+            },
+            "dspcbsd_distill_epfa": {
+                "display_name": "DsPCBSD+ / Distill-EPFA",
+                "group": "mainline",
+                "dataset": "DsPCBSD+",
+                "role": "distill",
+                "path": ROOT / "runs/dspcbsd_plus_distill_epfa/distill_epfa_fair/weights/best.pt",
+                "runtime_supported": True,
+            },
             "deeppcb_teacher": {
-                "display_name": "DeepPCB / Teacher",
+                "display_name": "DeepPCB / Teacher-YOLO11n",
                 "group": "teacher",
                 "dataset": "DeepPCB",
                 "role": "teacher",
@@ -162,7 +226,6 @@ class ModelRegistry:
             "deeppcb_student_epfa",
             "deeppcb_distill_epfa",
             "deeppcb_student_plain",
-            "deeppcb_baseline",
             "deeppcb_teacher",
         ]
         for key in preferred_order:
@@ -228,7 +291,7 @@ class ModelRegistry:
         return spec.path
 
     def as_json(self) -> Dict[str, object]:
-        models = self.list_models()
+        models = self.list_models(include_missing=True)
         current = self.current_model_spec()
         grouped: Dict[str, List[Dict[str, object]]] = {"mainline": [], "comparison": [], "teacher": []}
         payload_models = []

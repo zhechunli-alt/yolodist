@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 from uuid import uuid4
 
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 from src.yolodist.paths import ROOT
@@ -187,6 +187,15 @@ def _error_response_from_exception(exc: Exception) -> Tuple[Response, int]:
 
 def _safe_json_dump(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False, default=str)
+
+
+def _safe_json_load(raw: str | None) -> Any:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return None
 
 
 def create_app() -> Flask:
@@ -550,6 +559,114 @@ def create_app() -> Flask:
                 "Content-Disposition": f"attachment; filename=inspection_report_{record_uuid}.json"
             },
         )
+
+    @app.get("/api/v1/records/get")
+    def get_record() -> Any:
+        record_uuid = request.args.get("record_uuid", "").strip()
+        if not record_uuid:
+            return jsonify({"error": "record_uuid is required"}), 400
+
+        with sqlite3.connect(DB_PATH.as_posix()) as conn:
+            conn.row_factory = sqlite3.Row
+            record = conn.execute(
+                "SELECT * FROM inspection_records WHERE record_uuid = ?",
+                (record_uuid,),
+            ).fetchone()
+            if record is None:
+                return jsonify({"error": "record not found"}), 404
+            items = conn.execute(
+                """
+                SELECT det_index, cls, class_name, conf, x1, y1, x2, y2
+                FROM detection_items
+                WHERE record_uuid = ?
+                ORDER BY det_index ASC
+                """,
+                (record_uuid,),
+            ).fetchall()
+            note = conn.execute(
+                """
+                SELECT doctor_name, diagnosis, risk_level, created_at
+                FROM review_notes
+                WHERE record_uuid = ?
+                ORDER BY id DESC LIMIT 1
+                """,
+                (record_uuid,),
+            ).fetchone()
+
+        record_dict = dict(record)
+        return jsonify(
+            {
+                "record": record_dict,
+                "sample_meta": _safe_json_load(record_dict.get("meta_json")),
+                "infer_result": _safe_json_load(record_dict.get("result_json")),
+                "detection_items": [dict(x) for x in items],
+                "review_note": dict(note) if note else None,
+            }
+        )
+
+    @app.post("/api/v1/records/review/save")
+    def save_record_review() -> Any:
+        payload = request.get_json(silent=True) or {}
+        record_uuid = str(payload.get("record_uuid", "")).strip()
+        doctor_name = str(payload.get("doctor_name", "")).strip()
+        diagnosis = str(payload.get("diagnosis", "")).strip()
+        risk_level = str(payload.get("risk_level", "")).strip()
+        if not record_uuid:
+            return jsonify({"error": "record_uuid is required"}), 400
+
+        created_at = utc_now_iso()
+        with sqlite3.connect(DB_PATH.as_posix()) as conn:
+            exists = conn.execute(
+                "SELECT 1 FROM inspection_records WHERE record_uuid = ?",
+                (record_uuid,),
+            ).fetchone()
+            if exists is None:
+                return jsonify({"error": "record not found"}), 404
+            latest = conn.execute(
+                """
+                SELECT id
+                FROM review_notes
+                WHERE record_uuid = ?
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (record_uuid,),
+            ).fetchone()
+            if latest is None:
+                conn.execute(
+                    """
+                    INSERT INTO review_notes (
+                        record_uuid, doctor_name, diagnosis, risk_level, created_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (record_uuid, doctor_name, diagnosis, risk_level, created_at),
+                )
+            else:
+                conn.execute(
+                    """
+                    UPDATE review_notes
+                    SET doctor_name = ?, diagnosis = ?, risk_level = ?, created_at = ?
+                    WHERE id = ?
+                    """,
+                    (doctor_name, diagnosis, risk_level, created_at, int(latest["id"])),
+                )
+            conn.commit()
+        return jsonify({"ok": True, "record_uuid": record_uuid, "created_at": created_at})
+
+    @app.get("/api/v1/files/image")
+    def get_image_file() -> Any:
+        raw_path = request.args.get("path", "").strip()
+        if not raw_path:
+            return jsonify({"error": "path is required"}), 400
+        path = Path(raw_path).expanduser().resolve()
+        root = ROOT.resolve()
+        try:
+            path.relative_to(root)
+        except ValueError:
+            return jsonify({"error": "path out of allowed root"}), 403
+        if not path.exists() or not path.is_file():
+            return jsonify({"error": "image file not found"}), 404
+        return send_file(path.as_posix())
 
     @app.get("/api/v1/stats/summary")
     def stats_summary() -> Any:

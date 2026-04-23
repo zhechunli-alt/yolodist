@@ -22,11 +22,10 @@ feature_kd_layers = [15, 18, 21]
 teacher_feature_kd_layers = [15, 18, 21]
 project = "runs/dspcbsd_plus_distill_locfg"
 name = "distill_plain_locfg"
-epochs = 80
+epochs = 100
 imgsz = 640
 batch = 16
 device = "0"
 workers = 4
 seed = 42
 exist_ok = true
-
