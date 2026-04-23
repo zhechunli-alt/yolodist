@@ -947,3 +947,92 @@ PYTHONPATH=src python experiments/baseline/train.py --config configs/train/basel
   - `runs/paper_figures/generated/deeppcb_additional_train_curve_map5095.png`
   - `runs/paper_figures/generated/deeppcb_additional_train_curve_recall.png`
   - `runs/paper_figures/generated/deeppcb_additional_qualitative_panel.png`
+
+## 2026-04-23 阶段收口补记
+
+这一节用于补齐早期记录里尚未完全同步到位的最新事实，避免读者只翻到前半段时误以为项目仍停留在“中间态”。
+
+### 2026-04-23 Distill-Plain 三数据集补权重完成
+
+- 状态：`已完成`
+- 说明：
+  - 为补齐演示系统中的主线模型位，对三套数据集的 `distill_plain` 进行了统一补跑。
+  - 全部训练配置已统一到 `100 epoch`，不再沿用早期 `80 epoch` 试探设置。
+- 权重：
+  - `weights/best_deeppcb_distill_plain.pt`
+  - `weights/best_pku_distill_plain.pt`
+  - `weights/best_dspcbsd_distill_plain.pt`
+- 正式 `test` 结果：
+  - `DeepPCB`：
+    - `P=0.9277`
+    - `R=0.8928`
+    - `mAP50=0.9448`
+    - `mAP50-95=0.6060`
+  - `PKU-Market-PCB`：
+    - `P=0.7975`
+    - `R=0.6226`
+    - `mAP50=0.7212`
+    - `mAP50-95=0.3018`
+  - `DsPCBSD+`：
+    - `P=0.8271`
+    - `R=0.8285`
+    - `mAP50=0.8741`
+    - `mAP50-95=0.5486`
+
+### 2026-04-23 DeepPCB 推理时延基准补充
+
+- 状态：`已完成`
+- 样本规模：
+  - `DeepPCB test 500 张`
+- 预热：
+  - 每个模型 `5 张`
+- 统计口径：
+  - 使用后端 `InferEngine.infer()` 返回的纯推理时间
+  - 不包含 HTTP 上传、前端渲染和用户交互等待
+- 对比对象：
+  - `DeepPCB / Baseline-YOLO11n`
+  - `DeepPCB / Distill-EPFA`
+  - `FasterRCNN-R50-FPN`
+- 结果：
+  - `Baseline-YOLO11n`
+    - `mean=9.410 ms`
+    - `median=9.343 ms`
+    - `p95=9.857 ms`
+    - `fps=106.27`
+  - `Distill-EPFA`
+    - `mean=8.095 ms`
+    - `median=8.020 ms`
+    - `p95=8.643 ms`
+    - `fps=123.53`
+  - `FasterRCNN-R50-FPN`
+    - `mean=16.702 ms`
+    - `median=16.663 ms`
+    - `p95=17.030 ms`
+    - `fps=59.87`
+- 结论：
+  - 主线 YOLO 模型已经稳定在 `10ms` 左右量级。
+  - 经典强基线虽然精度更高，但速度明显更慢。
+
+### 2026-04-23 演示系统阶段能力收口
+
+- 状态：`已完成主要功能`
+- 当前系统支持：
+  - 三个数据集主线模型在线推理
+  - 文件夹批量检测、暂停、状态标记
+  - 记录导出与人工复核查改
+  - DeepPCB 非 YOLO 对比模型在线多模型对比
+- 当前支持在线对比的非 YOLO 模型：
+  - `FasterRCNN-MNV3-FPN`
+  - `RetinaNet-R50-FPN`
+  - `FCOS-R50-FPN`
+  - `FasterRCNN-R50-FPN`
+  - `FasterRCNN-R50-FPN-v2`
+- 当前数据库：
+  - `SQLite`
+  - 文件：`service/backend/data/inference_logs.db`
+- 当前上传文件持久化目录：
+  - `service/backend/data/uploads/`
+- 当前内置样本集：
+  - `assets/demo_samples/deeppcb/`
+  - `assets/demo_samples/pku/`
+  - `assets/demo_samples/dspcbsd_plus/`

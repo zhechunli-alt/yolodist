@@ -16,3 +16,4 @@ tensorboard>=2.16.0
 wheel>=0.42.0
 torchmetrics>=1.0.0
 pycocotools>=2.0.0
+matplotlib>=3.8.0
